@@ -1,0 +1,16 @@
+digraph {
+graph [splines=line]
+	node0x604000000190 [shape = Mrecord, label = "{node[0x604000000190] | parent[(nil)] |TYPE = OPR(0) | OP = + |  { <left>left[0x604000000150] | <right>right[0x604000000090] }}"];
+	node0x604000000190:<left> -> node0x604000000150;
+	node0x604000000150 [shape = Mrecord, label = "{node[0x604000000150] | parent[0x604000000190] |TYPE = OPR(0) | OP = * |  { <left>left[0x604000000110] | <right>right[0x6040000000d0] }}"];
+	node0x604000000150:<left> -> node0x604000000110;
+	node0x604000000110 [shape = Mrecord, label = "{node[0x604000000110] | parent[0x604000000150] |TYPE = OPR(2) | OP = 5 |  { <left>left[(nil)] | <right>right[(nil)] }}"];
+	node0x604000000150:<right> -> node0x6040000000d0;
+	node0x6040000000d0 [shape = Mrecord, label = "{node[0x6040000000d0] | parent[0x604000000150] |TYPE = VAR(1) | VAR = x |  { <left>left[(nil)] | <right>right[(nil)] }}"];
+	node0x604000000190:<right> -> node0x604000000090;
+	node0x604000000090 [shape = Mrecord, label = "{node[0x604000000090] | parent[0x604000000190] |TYPE = OPR(0) | OP = - |  { <left>left[0x604000000050] | <right>right[0x604000000010] }}"];
+	node0x604000000090:<left> -> node0x604000000050;
+	node0x604000000050 [shape = Mrecord, label = "{node[0x604000000050] | parent[0x604000000090] |TYPE = OPR(2) | OP = 12 |  { <left>left[(nil)] | <right>right[(nil)] }}"];
+	node0x604000000090:<right> -> node0x604000000010;
+	node0x604000000010 [shape = Mrecord, label = "{node[0x604000000010] | parent[0x604000000090] |TYPE = OPR(2) | OP = 7 |  { <left>left[(nil)] | <right>right[(nil)] }}"];
+}
