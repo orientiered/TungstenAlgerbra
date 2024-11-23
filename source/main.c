@@ -10,6 +10,7 @@
 
 int main() {
     logOpen("log.html", L_HTML_MODE);
+    setLogLevel(L_EXTRA);
 
     Node_t *expr = OPR_('+', OPR_('*', NUM_(5), VAR_('x')),
                              OPR_('-', NUM_(12), NUM_(7)));
@@ -18,6 +19,16 @@ int main() {
 
     setVariable('x', 7.0);
     printf("Evaluated: %lg\n", evaluate(expr, NULL));
+    deleteTree(expr);
+
+    expr = parseExpressionPrefix("(+ (x) (- (-3) (52) ) )");
+    DUMP_TREE(expr);
+    deleteTree(expr);
+
+    char *exprStr = NULL;
+    scanf("%m[^\n]", &exprStr);
+    expr = parseExpressionPrefix(exprStr);
+    DUMP_TREE(expr);
     deleteTree(expr);
 
     logClose();

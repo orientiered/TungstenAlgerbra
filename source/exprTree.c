@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <stdbool.h>
+#include <ctype.h>
 
 #include "logger.h"
 #include "exprTree.h"
@@ -28,6 +29,8 @@ double getVariable(char variable) {
 /*================================*/
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right) {
+    logPrint(L_EXTRA, 0, "ExprTree:Creating node\n");
+
     Node_t *newNode = CALLOC(1, Node_t);
     newNode->type = type;
     newNode->left  = left;
@@ -52,11 +55,14 @@ Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node
             assert(0);
     }
 
+    logPrint(L_EXTRA, 0, "ExprTree:Created node[%p]\n", newNode);
     return newNode;
 }
 
 Node_t *copyTree(Node_t *node) {
     assert(node);
+
+    logPrint(L_EXTRA, 0, "ExprTree:Copying node[%p]\n", node);
 
     Node_t *left  = (node->left)  ? copyTree(node->left)  : NULL,
            *right = (node->right) ? copyTree(node->right) : NULL;
@@ -66,6 +72,8 @@ Node_t *copyTree(Node_t *node) {
 
 double evaluate(Node_t *node, bool *usedVariable) {
     assert(node);
+
+    logPrint(L_EXTRA, 0, "ExprTree:Evaluating node[%p]\n", node);
 
     switch(node->type) {
         case VARIABLE:
@@ -96,6 +104,99 @@ double evaluate(Node_t *node, bool *usedVariable) {
 
     assert(0);
     return 0.0;
+}
+
+static Node_t *recursiveParseExpressionPrefix(const char **expression);
+
+Node_t *parseExpressionPrefix(const char *expression) {
+    assert(expression);
+    const char *exprCopy = expression;
+    Node_t *exprTree = recursiveParseExpressionPrefix(&exprCopy);
+    return exprTree;
+}
+
+static enum ElemType getElemType(const char **expression, int *varOrOperator) {
+    if (**expression == '+' || **expression == '-') {
+        //if next symbol is digit, + and - is unary
+        if (isdigit((*expression)[1])) {
+            return NUMBER;
+        }
+
+
+        *varOrOperator = **expression;
+        (*expression)++;
+        return OPERATOR;
+    }
+
+    if (**expression == '/' || **expression == '*') {
+        *varOrOperator = **expression;
+        (*expression)++;
+        return OPERATOR;
+    }
+
+    if (**expression == 'x') {
+        *varOrOperator = 'x';
+        (*expression)++;
+        return VARIABLE;
+    }
+
+    return NUMBER;
+}
+
+static Node_t *recursiveParseExpressionPrefix(const char **expression) {
+    assert(expression);
+    assert(*expression);
+
+    int shift = 0;
+    sscanf(*expression, " ( %n", &shift);
+    if (shift == 0) {
+        logPrint(L_ZERO, 1, "Wrong syntax: no (\n");
+        return NULL;
+    }
+
+    (*expression) += shift;
+    shift = 0;
+
+
+    int varOrOperator = 0;
+    double number = 0;
+    enum ElemType type = getElemType(expression, &varOrOperator);
+
+    Node_t *left = NULL, *right = NULL;
+    switch(type) {
+        case NUMBER:
+            sscanf(*expression, " %lg %n", &number, &shift);
+            if (shift == 0) {
+                logPrint(L_ZERO, 1, "Can't read number\n");
+                return NULL;
+            }
+            (*expression) += shift;
+            shift = 0;
+            break;
+        case VARIABLE:
+            break;
+        case OPERATOR:
+            left = recursiveParseExpressionPrefix(expression);
+            if (!left) return NULL;
+            right = recursiveParseExpressionPrefix(expression);
+            if (!right) return NULL;
+
+            break;
+        default:
+            logPrint(L_ZERO, 1, "Unknown element type\n");
+            return NULL;
+    }
+
+    sscanf(*expression, " ) %n", &shift);
+    if (shift == 0) {
+        logPrint(L_ZERO, 1, "Wrong syntax: no )\n");
+        return NULL;
+    }
+
+    (*expression) += shift;
+    shift = 0;
+
+    return createNode(type, varOrOperator, number, left, right);
 }
 
 
@@ -142,16 +243,16 @@ static TungstenStatus_t recursiveDumpTree(Node_t *node, FILE *dotFile) {
 
     switch(node->type) {
         case OPERATOR:
-            fprintf(dotFile, "TYPE = OPR(%d) | OP = %c | ", node->type, node->value.op);
+            fprintf(dotFile, "TYPE = OPR(%d) | %c | ", node->type, node->value.op);
             break;
         case VARIABLE:
-            fprintf(dotFile, "TYPE = VAR(%d) | VAR = %c | ", node->type, node->value.var);
+            fprintf(dotFile, "TYPE = VAR(%d) | %c | ", node->type, node->value.var);
             break;
         case NUMBER:
-            fprintf(dotFile, "TYPE = OPR(%d) | OP = %lg | ", node->type, node->value.number);
+            fprintf(dotFile, "TYPE = NUM(%d) | %lg | ", node->type, node->value.number);
             break;
         default:
-            fprintf(dotFile, "TYPE = ???(%d) | OP = %d | ", node->type, node->value.var);
+            fprintf(dotFile, "TYPE = ???(%d) | %d | ", node->type, node->value.var);
             break;
     }
 
@@ -173,7 +274,7 @@ static TungstenStatus_t recursiveDumpTree(Node_t *node, FILE *dotFile) {
 TungstenStatus_t deleteTree(Node_t *node) {
     assert(node);
 
-    logPrint(L_EXTRA, 0, "Deleting tree[%p]\n", node);
+    logPrint(L_EXTRA, 0, "ExprTree:Deleting tree[%p]\n", node);
 
     if (node->left)
         deleteTree(node->left);

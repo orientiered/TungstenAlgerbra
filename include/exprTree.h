@@ -15,12 +15,13 @@ enum ElemType {
     NUMBER
 };
 
-enum OperatorType {
+typedef enum OperatorType {
+    NULL_OPERATOR = '\0',
     ADD = '+',
     SUB = '-',
     MUL = '*',
     DIV = '/'
-};
+} OperatorType_t;
 
 typedef enum TungstenStatus_t {
     TA_SUCCESS,
@@ -51,13 +52,17 @@ double getVariable(char variable);
 
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right);
+TungstenStatus_t deleteTree(Node_t *node);
 
 Node_t *copyTree(Node_t *node);
 
-double evaluate(Node_t *node, bool *usedVariable);
 
 TungstenStatus_t verifyTree(Node_t *node);
 TungstenStatus_t dumpTree(Node_t *node);
+
+Node_t *parseExpressionPrefix(const char *expression);
+
+double evaluate(Node_t *node, bool *usedVariable);
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)
 
@@ -71,6 +76,5 @@ TungstenStatus_t dumpTree(Node_t *node);
 
 #endif
 
-TungstenStatus_t deleteTree(Node_t *node);
 
 #endif
