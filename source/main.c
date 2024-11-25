@@ -3,33 +3,35 @@
 
 #include "logger.h"
 #include "exprTree.h"
-
-#define OPR_(op, left, right) createNode(OPERATOR, op, 0, left, right)
-#define NUM_(num) createNode(NUMBER, 0, num, NULL, NULL)
-#define VAR_(variable) createNode(VARIABLE, variable, 0, NULL, NULL)
+#include "derivative.h"
+#include "treeDSL.h"
 
 int main() {
     logOpen("log.html", L_HTML_MODE);
     setLogLevel(L_EXTRA);
+    logDisableBuffering();
 
-    Node_t *expr = OPR_('+', OPR_('*', NUM_(5), VAR_('x')),
-                             OPR_('-', NUM_(12), NUM_(7)));
+    Node_t *expr = OPR_(ADD, OPR_(MUL, NUM_(5), NUM_(3)),
+                             OPR_(SUB, NUM_(12), NUM_(7)));
 
-    DUMP_TREE(expr);
+    DUMP_TREE(expr, 0);
 
-    setVariable('x', 7.0);
+    setVariable("x", 7.0);
     printf("Evaluated: %lg\n", evaluate(expr, NULL));
     deleteTree(expr);
 
     expr = parseExpressionPrefix("(+ (x) (- (-3) (52) ) )");
-    DUMP_TREE(expr);
+    DUMP_TREE(expr, 1);
     deleteTree(expr);
 
     char *exprStr = NULL;
     scanf("%m[^\n]", &exprStr);
     expr = parseExpressionPrefix(exprStr);
-    DUMP_TREE(expr);
+    DUMP_TREE(expr, 1);
+    Node_t *d = derivative(expr);
+    DUMP_TREE(d, 1);
     deleteTree(expr);
+    deleteTree(d);
 
     logClose();
     return 0;

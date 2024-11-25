@@ -50,7 +50,7 @@ GLOBAL_DEPS     := $(GLOBAL_OBJS:%.o=%.d)
 # CONTAINER_OBJS  := $(subst source,$(OBJDIR), $(CONTAINER_SRCS:%.cpp=%.o))
 # CONTAINER_DEPS  := $(CONTAINER_OBJS:%.o=%.d)
 
-LOCAL_SRCS      := $(addprefix source/, main.c exprTree.c)
+LOCAL_SRCS      := $(addprefix source/, main.c exprTree.c derivative.c)
 LOCAL_OBJS      := $(subst source,$(OBJDIR), $(LOCAL_SRCS:%.c=%.o))
 LOCAL_DEPS      := $(LOCAL_OBJS:%.o=%.d)
 
