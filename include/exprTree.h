@@ -14,6 +14,8 @@ const char * const DEFAULT_NODE_COLOR   = "#000000";
 const size_t DUMP_BUFFER_SIZE = 128;
 const size_t PARSER_BUFFER_SIZE = 32;
 
+const double DOUBLE_EPSILON = 1e-7; //epsilon for comparing doubles
+
 enum ElemType {
     OPERATOR,
     VARIABLE,
@@ -93,7 +95,11 @@ Node_t *parseExpressionPrefix(const char *expression);
 
 double evaluate(Node_t *node, bool *usedVariable);
 
+/// @brief Fold constants in tree.
+/// !NOTE: Do not assign return value of this function, all simplifications are done inplace
 Node_t *foldConstants(Node_t *node);
+
+Node_t *removeNeutralOperations(Node_t *node);
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)
 

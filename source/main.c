@@ -33,7 +33,8 @@ int main() {
     DUMP_TREE(d, 1);
     foldConstants(d);
     DUMP_TREE(d, 1);
-
+    d = removeNeutralOperations(d);
+    DUMP_TREE(d, 1);
     deleteTree(expr);
     deleteTree(d);
 

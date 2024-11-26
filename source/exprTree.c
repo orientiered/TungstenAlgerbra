@@ -14,6 +14,36 @@
 
 #define CALLOC(size, type) (type *) calloc((size), sizeof(type))
 
+static double calculateOperation(enum OperatorType op, double left, double right) {
+    switch(op) {
+        case ADD:
+            return left + right;
+        case SUB:
+            return left - right;
+        case MUL:
+            return left * right;
+        case DIV:
+            return left /right;
+        case POW:
+            return pow(left, right);
+        case SIN:
+            return sin(left);
+        case COS:
+            return cos(left);
+        case TAN:
+            return tan(left);
+        case CTG:
+            return 1/tan(left);
+        case LOG:
+            return log(right) / log(left);
+        case LOGN:
+            return log(left);
+        default:
+            LOG_PRINT(L_ZERO, 1, "Operation %d is not implemented\n", op);
+            return 0;
+            break;
+    }
+}
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right) {
     logPrint(L_EXTRA, 0, "ExprTree:Creating node\n");
@@ -77,33 +107,7 @@ double evaluate(Node_t *node, bool *usedVariable) {
             if (operators[node->value.op].binary)
                 rightValue = evaluate(node->right, usedVariable);
 
-            switch(node->value.op) {
-                case ADD:
-                    return leftValue + rightValue;
-                case SUB:
-                    return leftValue - rightValue;
-                case MUL:
-                    return leftValue * rightValue;
-                case DIV:
-                    return leftValue /rightValue;
-                case POW:
-                    return pow(leftValue, rightValue);
-                case SIN:
-                    return sin(leftValue);
-                case COS:
-                    return cos(leftValue);
-                case TAN:
-                    return tan(leftValue);
-                case CTG:
-                    return 1/tan(leftValue);
-                case LOG:
-                    return log(rightValue) / log(leftValue);
-                case LOGN:
-                    return log(leftValue);
-                default:
-                    assert(0);
-                    break;
-            }
+            return calculateOperation(node->value.op, leftValue, rightValue);
             break;
         }
         default:
@@ -336,48 +340,70 @@ Node_t *foldConstants(Node_t *node) {
         right = foldConstants(node->right);
 
     if (left && (!binary || (binary && right) ) ) {
-        switch (node->value.op) {
-            case ADD:
-                node->value.number = left->value.number + right->value.number;
-                break;
-            case SUB:
-                node->value.number = left->value.number - right->value.number;
-                break;
-            case MUL:
-                node->value.number = left->value.number * right->value.number;
-                break;
-            case DIV:
-                node->value.number = left->value.number / right->value.number;
-                break;
-            case POW:
-                node->value.number = pow(left->value.number, right->value.number);
-                break;
-            case SIN:
-                node->value.number = sin(left->value.number);
-                break;
-            case COS:
-                node->value.number = cos(left->value.number);
-                break;
-            case TAN:
-                node->value.number = tan(left->value.number);
-                break;
-            case CTG:
-                node->value.number = 1/tan(left->value.number);
-                break;
-            case LOG:
-                node->value.number = log(left->value.number) / log(right->value.number);
-                break;
-            case LOGN:
-                node->value.number = log(left->value.number);
-                break;
-            default:
-                assert(0);
+        node->value.number = calculateOperation(node->value.op, left->value.number,
+                                                                (right) ? (right->value.number) : 0);
+        deleteTree(node->left); node->left = NULL;
+        if (right) {
+            deleteTree(node->right); node->right = NULL;
         }
-        deleteTree(node->left);
-        if (right) deleteTree(node->right);
-        node->left = NULL;
-        node->right = NULL;
         node->type = NUMBER;
         return node;
     } else return NULL;
+}
+
+static bool isEqualDouble(double a, double b) {
+    return fabs(b-a) < DOUBLE_EPSILON;
+}
+
+// static linkNode(Node_t *destination, Node_t *source)
+Node_t *removeNeutralOperations(Node_t *node) {
+    assert(node);
+
+    if (node->type == NUMBER)
+        return node;
+    if (node->type == VARIABLE)
+        return node;
+
+    if (node->left) {
+        node->left = removeNeutralOperations(node->left);
+    }
+
+    if (node->right) {
+        node->right = removeNeutralOperations(node->right);
+    }
+
+    Node_t *result = node;
+    if (node->type == OPERATOR) {
+        if (node->value.op == ADD) {
+            if (node->left->type == NUMBER &&
+                isEqualDouble(node->left->value.number, 0)) {
+                    node->right->parent = node->parent;
+                    result = node->right;
+                    node->right = NULL;
+            } else
+            if (node->right->type == NUMBER &&
+                isEqualDouble(node->right->value.number, 0)) {
+                    node->left->parent = node->parent;
+                    result = node->left;
+                    node->left = NULL;
+            }
+        } else if (node->value.op == MUL) {
+            if (node->left->type == NUMBER &&
+                isEqualDouble(node->left->value.number, 1)) {
+                    node->right->parent = node->parent;
+                    result = node->right;
+                    node->right = NULL;
+            } else
+            if (node->right->type == NUMBER &&
+                isEqualDouble(node->right->value.number, 1)) {
+                    node->left->parent = node->parent;
+                    result = node->left;
+                    node->left = NULL;
+            }
+        } else return node;
+    }
+
+    if (result != node)
+        deleteTree(node);
+    return result;
 }

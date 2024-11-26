@@ -108,6 +108,7 @@ Node_t *derivativeBase(Node_t *expr, int variable) {
                     break;
             }
         }
+        break;
         default:
             logPrint(L_ZERO, 1, "Unknown expression type %d\n", expr->type);
             break;
