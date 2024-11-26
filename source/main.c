@@ -4,6 +4,7 @@
 #include "logger.h"
 #include "exprTree.h"
 #include "derivative.h"
+#include "nameTable.h"
 #include "treeDSL.h"
 
 int main() {
@@ -28,11 +29,15 @@ int main() {
     scanf("%m[^\n]", &exprStr);
     expr = parseExpressionPrefix(exprStr);
     DUMP_TREE(expr, 1);
-    Node_t *d = derivative(expr);
+    Node_t *d = derivative(expr, "x");
     DUMP_TREE(d, 1);
+    foldConstants(d);
+    DUMP_TREE(d, 1);
+
     deleteTree(expr);
     deleteTree(d);
 
     logClose();
+    free(exprStr);
     return 0;
 }

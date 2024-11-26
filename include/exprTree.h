@@ -13,8 +13,6 @@ const char * const NUMBER_COLOR         = "#107980";
 const char * const DEFAULT_NODE_COLOR   = "#000000";
 const size_t DUMP_BUFFER_SIZE = 128;
 const size_t PARSER_BUFFER_SIZE = 32;
-const size_t VARIABLES_TABLE_LEN = 64;
-const size_t MAX_VARIABLE_LEN = 8;
 
 enum ElemType {
     OPERATOR,
@@ -82,9 +80,6 @@ typedef struct Node_t {
 } Node_t;
 
 
-void setVariable(const char *variableName, double value);
-
-
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right);
 TungstenStatus_t deleteTree(Node_t *node);
 
@@ -97,6 +92,8 @@ TungstenStatus_t dumpTree(Node_t *node, bool minified);
 Node_t *parseExpressionPrefix(const char *expression);
 
 double evaluate(Node_t *node, bool *usedVariable);
+
+Node_t *foldConstants(Node_t *node);
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)
 

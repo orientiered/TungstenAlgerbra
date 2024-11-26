@@ -10,41 +10,10 @@
 #include "utils.h"
 #include "logger.h"
 #include "exprTree.h"
+#include "nameTable.h"
 
 #define CALLOC(size, type) (type *) calloc((size), sizeof(type))
 
-/*========Nametables==============*/
-const double defaultVariableValue = 0.0;
-
-typedef struct {
-    double number;
-    char str[MAX_VARIABLE_LEN];
-} variable_t;
-
-static variable_t variables[VARIABLES_TABLE_LEN] = {0};
-static size_t variablesCount = 0;
-
-static size_t insertVariable(const char *buffer) {
-    assert(strlen(buffer) < MAX_VARIABLE_LEN);
-
-    strcpy(variables[variablesCount++].str, buffer);
-    return variablesCount - 1;
-}
-
-void setVariable(const char *variableName, double value) {
-    for (size_t idx = 0; idx < variablesCount; idx++) {
-        if (strcmp(variableName, variables[idx].str) == 0)
-            variables[idx].number = value;
-        return;
-    }
-
-    logPrint(L_ZERO, 1, "Attempt to set unknown variable '%s'\n", variableName);
-}
-
-static double getVariable(int varIdx) {
-    return variables[varIdx].number;
-}
-/*================================*/
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right) {
     logPrint(L_EXTRA, 0, "ExprTree:Creating node\n");
@@ -189,6 +158,7 @@ static enum ElemType scanElement(char *buffer, union NodeValue *value) {
         buffer[MAX_VARIABLE_LEN] = '\0';
         logPrint(L_ZERO, 1, "Variable name is too long\nIt will be truncated to '%s'\n", buffer);
     }
+
     value->var = insertVariable(buffer);
     return VARIABLE;
 }
@@ -301,7 +271,7 @@ static TungstenStatus_t recursiveDumpTree(Node_t *node, bool minified, FILE *dot
             break;
         case VARIABLE:
             fillColor = VARIABLE_COLOR;
-            fprintf(dotFile, "TYPE = VAR(%d) | %s | ", node->type, variables[node->value.var].str);
+            fprintf(dotFile, "TYPE = VAR(%d) | %s(%d) | ", node->type, getVariableName(node->value.var), node->value.var);
             break;
         case NUMBER:
             fillColor = NUMBER_COLOR;
@@ -347,4 +317,67 @@ TungstenStatus_t deleteTree(Node_t *node) {
     free(node);
 
     return TA_SUCCESS;
+}
+
+
+/*===========Tree simplification================================*/
+Node_t *foldConstants(Node_t *node) {
+    if (node->type == NUMBER) {
+        return node;
+    }
+
+    if (node->type == VARIABLE)
+        return NULL;
+
+    bool binary = operators[node->value.op].binary;
+    Node_t *left = NULL, *right = NULL;
+    left = foldConstants(node->left);
+    if (binary)
+        right = foldConstants(node->right);
+
+    if (left && (!binary || (binary && right) ) ) {
+        switch (node->value.op) {
+            case ADD:
+                node->value.number = left->value.number + right->value.number;
+                break;
+            case SUB:
+                node->value.number = left->value.number - right->value.number;
+                break;
+            case MUL:
+                node->value.number = left->value.number * right->value.number;
+                break;
+            case DIV:
+                node->value.number = left->value.number / right->value.number;
+                break;
+            case POW:
+                node->value.number = pow(left->value.number, right->value.number);
+                break;
+            case SIN:
+                node->value.number = sin(left->value.number);
+                break;
+            case COS:
+                node->value.number = cos(left->value.number);
+                break;
+            case TAN:
+                node->value.number = tan(left->value.number);
+                break;
+            case CTG:
+                node->value.number = 1/tan(left->value.number);
+                break;
+            case LOG:
+                node->value.number = log(left->value.number) / log(right->value.number);
+                break;
+            case LOGN:
+                node->value.number = log(left->value.number);
+                break;
+            default:
+                assert(0);
+        }
+        deleteTree(node->left);
+        if (right) deleteTree(node->right);
+        node->left = NULL;
+        node->right = NULL;
+        node->type = NUMBER;
+        return node;
+    } else return NULL;
 }
