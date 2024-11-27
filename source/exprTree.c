@@ -359,51 +359,88 @@ static bool isEqualDouble(double a, double b) {
 Node_t *removeNeutralOperations(Node_t *node) {
     assert(node);
 
-    if (node->type == NUMBER)
-        return node;
-    if (node->type == VARIABLE)
+    if (node->type == NUMBER || node->type == VARIABLE)
         return node;
 
-    if (node->left) {
+    if (node->left)
         node->left = removeNeutralOperations(node->left);
-    }
 
-    if (node->right) {
+    if (node->right)
         node->right = removeNeutralOperations(node->right);
-    }
 
     Node_t *result = node;
+    bool leftIsNumber  = (node->left->type == NUMBER);
+    bool rightIsNumber = (node->right && node->right->type == NUMBER);
+
+    bool leftIsZero    = leftIsNumber && isEqualDouble(node->left->value.number, 0);
+    bool leftIsOne     = leftIsNumber && isEqualDouble(node->left->value.number, 1);
+
+    bool rightIsZero   = rightIsNumber && isEqualDouble(node->right->value.number, 0);
+    bool rightIsOne    = rightIsNumber && isEqualDouble(node->right->value.number, 1);
+
     if (node->type == OPERATOR) {
         if (node->value.op == ADD) {
-            if (node->left->type == NUMBER &&
-                isEqualDouble(node->left->value.number, 0)) {
+        /*ADDITION*/
+            if (leftIsZero) {
+            // 0 + x = x
                     node->right->parent = node->parent;
                     result = node->right;
-                    node->right = NULL;
-            } else
-            if (node->right->type == NUMBER &&
-                isEqualDouble(node->right->value.number, 0)) {
+            } else if (rightIsZero) {
+            // x + 0 = 0
                     node->left->parent = node->parent;
                     result = node->left;
-                    node->left = NULL;
+            }
+
+        } else if (node->value.op == SUB) {
+        /*SUBSTRACTION*/
+            if (rightIsZero) {
+            // x - 0 = x
+                node->left->parent = node->parent;
+                result = node->left;
             }
         } else if (node->value.op == MUL) {
-            if (node->left->type == NUMBER &&
-                isEqualDouble(node->left->value.number, 1)) {
-                    node->right->parent = node->parent;
-                    result = node->right;
-                    node->right = NULL;
-            } else
-            if (node->right->type == NUMBER &&
-                isEqualDouble(node->right->value.number, 1)) {
-                    node->left->parent = node->parent;
-                    result = node->left;
-                    node->left = NULL;
+        /*MULTIPLICATION*/
+            if (leftIsOne) {
+                node->right->parent = node->parent;
+                result = node->right;
+            } else if (leftIsZero) {
+                node->left->parent = node->parent;
+                result = node->left;
+            } else if (rightIsOne) {
+                node->left->parent = node->parent;
+                result = node->left;
+            } else if (rightIsZero) {
+                node->right->parent = node->parent;
+                result = node->right;
             }
-        } else return node;
+
+        } else if (node->value.op == POW) {
+        /*POWER*/
+            if (rightIsOne) {
+            // x ^ 1 = x
+                node->left->parent = node->parent;
+                result = node->left;
+            } else if (rightIsZero) {
+            // x ^ 0 = 1
+                node->right->parent = node->parent;
+                node->right->value.number = 1;
+                result = node->right;
+            } else if (leftIsZero) {
+            //0 ^ x = 0
+                node->left->parent = node->parent;
+                result = node->left;
+            }
+        }
     }
 
-    if (result != node)
+    if (result != node) {
+        //unlinking result subtree from node to use deleteTree() function
+        if (result == node->left)
+            node->left = NULL;
+        else
+            node->right = NULL;
+
         deleteTree(node);
+    }
     return result;
 }
