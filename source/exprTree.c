@@ -9,6 +9,7 @@
 
 #include "utils.h"
 #include "logger.h"
+#include "tex.h"
 #include "exprTree.h"
 #include "nameTable.h"
 
@@ -325,7 +326,7 @@ TungstenStatus_t deleteTree(Node_t *node) {
 
 
 /*===========Tree simplification================================*/
-Node_t *foldConstants(Node_t *node) {
+Node_t *foldConstants(Node_t *node, bool *changedTree) {
     if (node->type == NUMBER) {
         return node;
     }
@@ -335,11 +336,13 @@ Node_t *foldConstants(Node_t *node) {
 
     bool binary = operators[node->value.op].binary;
     Node_t *left = NULL, *right = NULL;
-    left = foldConstants(node->left);
+    left = foldConstants(node->left, changedTree);
     if (binary)
-        right = foldConstants(node->right);
+        right = foldConstants(node->right, changedTree);
 
     if (left && (!binary || (binary && right) ) ) {
+        if (changedTree)
+            *changedTree = true;
         node->value.number = calculateOperation(node->value.op, left->value.number,
                                                                 (right) ? (right->value.number) : 0);
         deleteTree(node->left); node->left = NULL;
@@ -356,17 +359,17 @@ static bool isEqualDouble(double a, double b) {
 }
 
 // static linkNode(Node_t *destination, Node_t *source)
-Node_t *removeNeutralOperations(Node_t *node) {
+Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
     assert(node);
 
     if (node->type == NUMBER || node->type == VARIABLE)
         return node;
 
     if (node->left)
-        node->left = removeNeutralOperations(node->left);
+        node->left = removeNeutralOperations(node->left, changedTree);
 
     if (node->right)
-        node->right = removeNeutralOperations(node->right);
+        node->right = removeNeutralOperations(node->right, changedTree);
 
     Node_t *result = node;
     bool leftIsNumber  = (node->left->type == NUMBER);
@@ -383,12 +386,12 @@ Node_t *removeNeutralOperations(Node_t *node) {
         /*ADDITION*/
             if (leftIsZero) {
             // 0 + x = x
-                    node->right->parent = node->parent;
-                    result = node->right;
+                node->right->parent = node->parent;
+                result = node->right;
             } else if (rightIsZero) {
             // x + 0 = 0
-                    node->left->parent = node->parent;
-                    result = node->left;
+                node->left->parent = node->parent;
+                result = node->left;
             }
 
         } else if (node->value.op == SUB) {
@@ -434,6 +437,8 @@ Node_t *removeNeutralOperations(Node_t *node) {
     }
 
     if (result != node) {
+        if (changedTree)
+            *changedTree = true;
         //unlinking result subtree from node to use deleteTree() function
         if (result == node->left)
             node->left = NULL;
@@ -442,5 +447,74 @@ Node_t *removeNeutralOperations(Node_t *node) {
 
         deleteTree(node);
     }
+    return result;
+}
+
+Node_t *simplifyExpression(Node_t *node) {
+    bool changedTree = false;
+    do {
+        exprTexDump(node);
+        texPrintf(" = ");
+        changedTree = false;
+        foldConstants(node, &changedTree);
+        node = removeNeutralOperations(node, &changedTree);
+        exprTexDump(node);
+        texPrintf("\n\n");
+    } while (changedTree);
+
+    return node;
+}
+
+static int exprTexDumpRecursive(Node_t *node);
+
+int exprTexDump(Node_t *node) {
+    assert(node);
+
+    int result = 0;
+
+    result += texPrintf("$");
+    result += exprTexDumpRecursive(node);
+    result += texPrintf("$");
+
+    return result;
+}
+
+static int exprTexDumpRecursive(Node_t *node) {
+    assert(node);
+
+    if (node->type == NUMBER)
+        return texPrintf("%lg", node->value.number);
+    if (node->type == VARIABLE)
+        return texPrintf("%s", getVariableName(node->value.var));
+
+    int result = 0;
+    if (node->type == OPERATOR) {
+        if (operators[node->value.op].binary) {
+            if (node->value.op == DIV) {
+                result += texPrintf("\\frac{");
+                result += exprTexDumpRecursive(node->left);
+                result += texPrintf("}{");
+                result += exprTexDumpRecursive(node->right);
+                result += texPrintf("}");
+            } else if (node->value.op == POW) {
+                result += exprTexDumpRecursive(node->left);
+                result += texPrintf("^{");
+                result += exprTexDumpRecursive(node->right);
+                result += texPrintf("}");
+            } else {
+                result += texPrintf("(");
+                result += exprTexDumpRecursive(node->left);
+                result += texPrintf("%s", operators[node->value.op].str);
+                result += exprTexDumpRecursive(node->right);
+                result += texPrintf(")");
+
+            }
+        } else {
+            result += texPrintf("\\%s(", operators[node->value.op].str);
+            result += exprTexDumpRecursive(node->left);
+            result += texPrintf(")");
+        }
+    }
+
     return result;
 }

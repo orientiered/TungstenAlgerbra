@@ -6,9 +6,11 @@
 #include "derivative.h"
 #include "nameTable.h"
 #include "treeDSL.h"
+#include "tex.h"
 
 int main() {
     logOpen("log.html", L_HTML_MODE);
+    texInit("textest.md");
     setLogLevel(L_EXTRA);
     logDisableBuffering();
 
@@ -31,13 +33,15 @@ int main() {
     DUMP_TREE(expr, 1);
     Node_t *d = derivative(expr, "x");
     DUMP_TREE(d, 1);
-    foldConstants(d);
+    d = simplifyExpression(d);
     DUMP_TREE(d, 1);
-    d = removeNeutralOperations(d);
-    DUMP_TREE(d, 1);
+
+    exprTexDump(d);
+
     deleteTree(expr);
     deleteTree(d);
 
+    texClose();
     logClose();
     free(exprStr);
     return 0;

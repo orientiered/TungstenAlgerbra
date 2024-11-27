@@ -80,9 +80,13 @@ Node_t *derivativeBase(Node_t *expr, int variable) {
                             return OPR_(MUL, OPR_(MUL, copyTree(expr), dR_),
                                              OPR_(LOGN, cL_, NULL) );
                         } else {
-                            //d(g^f) = d( e^(f*ln(g)) ) = g^f * d( f*ln(g) )
-                            return OPR_(MUL, copyTree(expr),
-                                             derivativeBase(OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) ), variable));
+                            //d(g^f) = d( e^(f*ln(g)) ) = g^f * d( f*ln(g) ) = g^f * (df*ln(g) + f*dg/g)
+                            Node_t *tempTree = OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) );
+
+                            Node_t *answer = OPR_(MUL, copyTree(expr), derivativeBase(tempTree, variable));
+
+                            deleteTree(tempTree);
+                            return answer;
                         }
                     }
 

@@ -66,7 +66,6 @@ static enum status constructFileName(const char *fileName) {
 
 enum status logOpen(const char *fileName, enum LogMode mode) {
     system("mkdir -p " LOGS_DIR);
-    setlocale(LC_ALL, LOGGER_LOCALE);
 
     logger.logMode = mode;
     if ((mode != L_TXT_MODE) && (mode != L_HTML_MODE)) {

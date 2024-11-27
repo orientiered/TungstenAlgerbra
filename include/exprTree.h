@@ -91,15 +91,20 @@ Node_t *copyTree(Node_t *node);
 TungstenStatus_t verifyTree(Node_t *node);
 TungstenStatus_t dumpTree(Node_t *node, bool minified);
 
+int exprTexDump(Node_t *node);
+
 Node_t *parseExpressionPrefix(const char *expression);
 
 double evaluate(Node_t *node, bool *usedVariable);
 
 /// @brief Fold constants in tree.
 /// !NOTE: Do not assign return value of this function, all simplifications are done inplace
-Node_t *foldConstants(Node_t *node);
+Node_t *foldConstants(Node_t *node, bool *changedTree);
 
-Node_t *removeNeutralOperations(Node_t *node);
+Node_t *removeNeutralOperations(Node_t *node, bool *changedTree);
+
+Node_t *simplifyExpression(Node_t *node);
+
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)
 
