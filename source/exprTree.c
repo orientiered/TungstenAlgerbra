@@ -479,6 +479,19 @@ int exprTexDump(Node_t *node) {
     return result;
 }
 
+static bool needBrackets(Node_t *node) {
+    assert(node);
+    if (node->type == NUMBER || node->type == VARIABLE)
+        return false;
+
+    if (node->type == OPERATOR) {
+        if (!operators[node->value.op].binary) return false;
+        if (!node->parent) return false;
+        return (operators[node->parent->value.op].priority > operators[node->value.op].priority);
+    }
+    return false;
+}
+
 static int exprTexDumpRecursive(Node_t *node) {
     assert(node);
 
@@ -497,17 +510,31 @@ static int exprTexDumpRecursive(Node_t *node) {
                 result += exprTexDumpRecursive(node->right);
                 result += texPrintf("}");
             } else if (node->value.op == POW) {
+                bool brackets = needBrackets(node->left);
+                if (brackets)
+                    result += texPrintf("(");
                 result += exprTexDumpRecursive(node->left);
+                if (brackets)
+                    result += texPrintf(")");
                 result += texPrintf("^{");
                 result += exprTexDumpRecursive(node->right);
                 result += texPrintf("}");
             } else {
-                result += texPrintf("(");
+                bool brackets = needBrackets(node->left);
+                if (brackets)
+                    result += texPrintf("(");
                 result += exprTexDumpRecursive(node->left);
-                result += texPrintf("%s", operators[node->value.op].str);
-                result += exprTexDumpRecursive(node->right);
-                result += texPrintf(")");
+                if (brackets)
+                    result += texPrintf(")");
 
+                result += texPrintf("%s", operators[node->value.op].str);
+
+                brackets = needBrackets(node->right);
+                if (brackets)
+                    result += texPrintf("(");
+                result += exprTexDumpRecursive(node->right);
+                if (brackets)
+                    result += texPrintf(")");
             }
         } else {
             result += texPrintf("\\%s(", operators[node->value.op].str);

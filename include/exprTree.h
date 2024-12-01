@@ -40,20 +40,21 @@ typedef struct {
     enum OperatorType opCode;
     bool binary;
     const char *str;
+    unsigned priority;
 } Operator_t;
 
 const Operator_t operators[] = {
-    {ADD, 1, "+"    },
-    {SUB, 1, "-"    },
-    {MUL, 1, "*"    },
-    {DIV, 1, "/"    },
-    {POW, 1, "^"    },
-    {SIN, 0, "sin"  },
-    {COS, 0, "cos"  },
-    {TAN, 0, "tg"   },
-    {CTG, 0, "ctg"  },
-    {LOG, 1, "log"  },
-    {LOGN, 0, "ln"  }
+    {ADD, 1, "+"   , 0},
+    {SUB, 1, "-"   , 0},
+    {MUL, 1, "*"   , 1},
+    {DIV, 1, "/"   , 2}, // \frac{}{},
+    {POW, 1, "^"   , 2},
+    {SIN, 0, "sin" , 3},
+    {COS, 0, "cos" , 3},
+    {TAN, 0, "tg"  , 3},
+    {CTG, 0, "ctg" , 3},
+    {LOG, 1, "log" , 3},
+    {LOGN, 0, "ln" , 3}
 };
 
 typedef enum TungstenStatus_t {
@@ -94,6 +95,9 @@ TungstenStatus_t dumpTree(Node_t *node, bool minified);
 int exprTexDump(Node_t *node);
 
 Node_t *parseExpressionPrefix(const char *expression);
+
+//Parse expression written if natural mathematical way
+Node_t *parseExpression(const char *expression);
 
 double evaluate(Node_t *node, bool *usedVariable);
 

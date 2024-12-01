@@ -29,7 +29,8 @@ int main() {
 
     char *exprStr = NULL;
     scanf("%m[^\n]", &exprStr);
-    expr = parseExpressionPrefix(exprStr);
+    expr = parseExpression(exprStr);
+    exprTexDump(expr);
     DUMP_TREE(expr, 1);
     Node_t *d = derivative(expr, "x");
     DUMP_TREE(d, 1);
