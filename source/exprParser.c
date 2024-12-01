@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <assert.h>
+#include <string.h>
 
 #include "logger.h"
 #include "exprTree.h"
@@ -37,7 +38,7 @@ Node_t *GetGrammar(ParseContext_t *context) {
     if (*context->pointer == '\0') {
         context->pointer++;
         return val;
-    } else SyntaxError(context, val, "GetGrammar: Expected '\\0', got %c", *context->pointer);
+    } else SyntaxError(context, val, "GetGrammar: Expected '\\0', got '%c'", *context->pointer);
 }
 
 Node_t *GetExpr(ParseContext_t *context) {
@@ -111,19 +112,41 @@ Node_t *GetPrimary(ParseContext_t *context) {
         }
     }
 
-    if (*context->pointer == 'x') {
-        movePointer(context);
-        size_t varIdx = insertVariable("x");
-        Node_t *val = createNode(VARIABLE, varIdx, 0, NULL, NULL);
+    Node_t *val = GetVar(context);
+    if (context->success)
         return val;
-    }
+    else
+        context->success = true;
 
-    Node_t *val = GetNum(context);
+    val = GetNum(context);
     if (!context->success)
         SyntaxError(context, val, "GetPrimary: expected (expr), 'x', or Number, got neither\n");
 
     return val;
 
+}
+
+Node_t *GetVar(ParseContext_t *context) {
+    char buffer[MAX_VARIABLE_LEN] = "";
+    const char *current = context->pointer;
+
+    if ('a' <= *current && *current <= 'z' || *current == '_') {
+        current++;
+    } else {
+        context->success = false;
+        return NULL;
+    }
+
+    while ('a' <= *current && *current <= 'z' ||
+           '0' <= *current && *current <= '9' ||
+           '_' == *current)
+        current++;
+
+    strncpy(buffer, context->pointer, (size_t)(current - context->pointer));
+    size_t varIdx = insertVariable(buffer);
+    context->pointer = current;
+    skipSpaces(context);
+    return createNode(VARIABLE, varIdx, 0, NULL, NULL);
 }
 
 Node_t *GetNum(ParseContext_t *context) {

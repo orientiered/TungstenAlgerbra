@@ -3,7 +3,7 @@
 
 typedef struct {
     const char *str;
-    const char *pointer;
+    const char *pointer;      // current position in str
     bool success;
 } ParseContext_t;
 
