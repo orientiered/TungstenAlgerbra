@@ -9,9 +9,9 @@
 
 #include "utils.h"
 #include "logger.h"
+#include "hashTable.h"
 #include "tex.h"
 #include "exprTree.h"
-#include "nameTable.h"
 
 #define CALLOC(size, type) (type *) calloc((size), sizeof(type))
 
@@ -44,6 +44,16 @@ static double calculateOperation(enum OperatorType op, double left, double right
             return 0;
             break;
     }
+}
+
+TungstenContext_t TungstenCtor() {
+    TungstenContext_t context = {hashTableCtor(VARIABLE_TABLE_SIZE), {0}, 0};
+    return context;
+}
+
+TungstenStatus_t TungstenDtor(TungstenContext_t *context) {
+    hashTableDtor(&context->variablesTable);
+    return TA_SUCCESS;
 }
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right) {
@@ -88,25 +98,23 @@ Node_t *copyTree(Node_t *node) {
     return createNode(node->type, node->value.var, node->value.number, left, right);
 }
 
-double evaluate(Node_t *node, bool *usedVariable) {
+double evaluate(TungstenContext_t *context, Node_t *node) {
     assert(node);
 
     logPrint(L_EXTRA, 0, "ExprTree:Evaluating node[%p]\n", node);
 
     switch(node->type) {
         case VARIABLE:
-            if (usedVariable)
-                *usedVariable = true;
-            return getVariable(node->value.var);
+            return getVariable(context, node->value.var);
         case NUMBER:
             return node->value.number;
         case OPERATOR:
         {
             double leftValue = 0, rightValue = 0;
-            leftValue = evaluate(node->left, usedVariable);
+            leftValue = evaluate(context, node->left);
 
             if (operators[node->value.op].binary)
-                rightValue = evaluate(node->right, usedVariable);
+                rightValue = evaluate(context, node->right);
 
             return calculateOperation(node->value.op, leftValue, rightValue);
             break;
@@ -120,116 +128,13 @@ double evaluate(Node_t *node, bool *usedVariable) {
     return 0.0;
 }
 
-static Node_t *recursiveParseExpressionPrefix(const char **expression);
-
-Node_t *parseExpressionPrefix(const char *expression) {
-    assert(expression);
-    const char *exprCopy = expression;
-    Node_t *exprTree = recursiveParseExpressionPrefix(&exprCopy);
-    if (!exprTree) {
-        logPrint(L_ZERO, 1, "Error ocurred here: '%s'\n", exprCopy);
-    }
-    return exprTree;
-}
-
-static const Operator_t *operatorFind(const char *str) {
-    assert(str);
-    for (size_t idx = 0; idx < ARRAY_SIZE(operators); idx++) {
-        if (strcmp(str, operators[idx].str) == 0)
-            return operators + idx;
-    }
-    return NULL;
-}
-
-static enum ElemType scanElement(char *buffer, union NodeValue *value) {
-    assert(buffer);
-    assert(value);
-
-    logPrint(L_EXTRA, 0, "Scanning elem '%s'\n", buffer);
-    const Operator_t *op = operatorFind(buffer);
-    if (op != NULL) {
-        value->op = op->opCode;
-        return OPERATOR;
-    }
-
-    size_t elemLen = strlen(buffer);
-
-    size_t scanned = 0;
-    if (sscanf(buffer, "%lg%n", &value->number, &scanned) == 1 && scanned == elemLen) {
-        return NUMBER;
-    }
-
-    if (elemLen >= MAX_VARIABLE_LEN) {
-        buffer[MAX_VARIABLE_LEN] = '\0';
-        logPrint(L_ZERO, 1, "Variable name is too long\nIt will be truncated to '%s'\n", buffer);
-    }
-
-    value->var = insertVariable(buffer);
-    return VARIABLE;
-}
-
-static Node_t *recursiveParseExpressionPrefix(const char **expression) {
-    assert(expression);
-    assert(*expression);
-
-    int shift = 0;
-    sscanf(*expression, " ( %n", &shift);
-    if (shift == 0) {
-        logPrint(L_ZERO, 1, "Wrong syntax: no (\n");
-        return NULL;
-    }
-
-    (*expression) += shift;
-    shift = 0;
-
-
-    union NodeValue value = {0};
-
-    char buffer[PARSER_BUFFER_SIZE] = "";
-    sscanf(*expression, " %[^() ] %n", buffer, &shift);
-    (*expression) += shift;
-    shift = 0;
-    enum ElemType type = scanElement(buffer, &value);
-
-    Node_t *left = NULL, *right = NULL;
-    switch(type) {
-        case NUMBER:
-        case VARIABLE:
-            break;
-        case OPERATOR:
-            left = recursiveParseExpressionPrefix(expression);
-            if (!left) return NULL;
-            if (operators[value.op].binary) {
-                right = recursiveParseExpressionPrefix(expression);
-                if (!right) return NULL;
-            }
-
-            break;
-        default:
-            logPrint(L_ZERO, 1, "Unknown element type\n");
-            return NULL;
-    }
-
-    sscanf(*expression, " ) %n", &shift);
-    if (shift == 0) {
-        logPrint(L_ZERO, 1, "Wrong syntax: no )\n");
-        return NULL;
-    }
-
-    (*expression) += shift;
-    shift = 0;
-
-    return createNode(type, value.var, value.number, left, right);
-}
-
-
 TungstenStatus_t verifyTree(Node_t *node) {
     return TA_SUCCESS;
 }
 
-static TungstenStatus_t recursiveDumpTree(Node_t *node, bool minified, FILE *dotFile);
+static TungstenStatus_t recursiveDumpTree(TungstenContext_t *context, Node_t *node, bool minified, FILE *dotFile);
 
-TungstenStatus_t dumpTree(Node_t *node, bool minified) {
+TungstenStatus_t dumpTree(TungstenContext_t *context, Node_t *node, bool minified) {
     static size_t dumpCounter = 0;
     dumpCounter++;
     system("mkdir -p " LOGS_DIR "/" DOTS_DIR " " LOGS_DIR "/" IMGS_DIR);
@@ -241,7 +146,7 @@ TungstenStatus_t dumpTree(Node_t *node, bool minified) {
     fprintf(dotFile, "digraph {\n"
                       "graph [splines=line]\n");
 
-    recursiveDumpTree(node, minified, dotFile);
+    recursiveDumpTree(context, node, minified, dotFile);
 
     fprintf(dotFile, "}\n");
     fclose(dotFile);
@@ -257,7 +162,7 @@ TungstenStatus_t dumpTree(Node_t *node, bool minified) {
     return TA_SUCCESS;
 }
 
-static TungstenStatus_t recursiveDumpTree(Node_t *node, bool minified, FILE *dotFile) {
+static TungstenStatus_t recursiveDumpTree(TungstenContext_t *context, Node_t *node, bool minified, FILE *dotFile) {
     if (!node) return TA_DUMP_ERROR;
     if (!dotFile) return TA_DUMP_ERROR;
 
@@ -276,7 +181,7 @@ static TungstenStatus_t recursiveDumpTree(Node_t *node, bool minified, FILE *dot
             break;
         case VARIABLE:
             fillColor = VARIABLE_COLOR;
-            fprintf(dotFile, "TYPE = VAR(%d) | %s(%d) | ", node->type, getVariableName(node->value.var), node->value.var);
+            fprintf(dotFile, "TYPE = VAR(%d) | %s(%d) | ", node->type, getVariableName(context, node->value.var), node->value.var);
             break;
         case NUMBER:
             fillColor = NUMBER_COLOR;
@@ -297,12 +202,12 @@ static TungstenStatus_t recursiveDumpTree(Node_t *node, bool minified, FILE *dot
 
     if (node->left) {
         fprintf(dotFile, "\tnode%p:<left> -> node%p;\n", node, node->left);
-        recursiveDumpTree(node->left, minified, dotFile);
+        recursiveDumpTree(context, node->left, minified, dotFile);
     }
 
     if (node->right) {
         fprintf(dotFile, "\tnode%p:<right> -> node%p;\n", node, node->right);
-        recursiveDumpTree(node->right, minified, dotFile);
+        recursiveDumpTree(context, node->right, minified, dotFile);
     }
 
     return TA_SUCCESS;
@@ -327,12 +232,11 @@ TungstenStatus_t deleteTree(Node_t *node) {
 
 /*===========Tree simplification================================*/
 Node_t *foldConstants(Node_t *node, bool *changedTree) {
-    if (node->type == NUMBER) {
+    if (node->type == NUMBER || node->type == VARIABLE) {
         return node;
     }
 
-    if (node->type == VARIABLE)
-        return NULL;
+    assert(node->type == OPERATOR);
 
     bool binary = operators[node->value.op].binary;
     Node_t *left = NULL, *right = NULL;
@@ -340,7 +244,7 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
     if (binary)
         right = foldConstants(node->right, changedTree);
 
-    if (left && (!binary || (binary && right) ) ) {
+    if (left->type == NUMBER && (!binary ||  right->type == NUMBER) ) {
         if (changedTree)
             *changedTree = true;
         node->value.number = calculateOperation(node->value.op, left->value.number,
@@ -350,8 +254,9 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
             deleteTree(node->right); node->right = NULL;
         }
         node->type = NUMBER;
-        return node;
-    } else return NULL;
+    }
+
+    return node;
 }
 
 static bool isEqualDouble(double a, double b) {
@@ -450,31 +355,31 @@ Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
     return result;
 }
 
-Node_t *simplifyExpression(Node_t *node) {
+Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     bool changedTree = false;
     do {
-        exprTexDump(node);
-        texPrintf(" = ");
+        exprTexDump(tex, context, node);
+        texPrintf(tex, " = ");
         changedTree = false;
-        foldConstants(node, &changedTree);
+        node = foldConstants(node, &changedTree);
         node = removeNeutralOperations(node, &changedTree);
-        exprTexDump(node);
-        texPrintf("\n\n");
+        exprTexDump(tex, context, node);
+        texPrintf(tex, "\n\n");
     } while (changedTree);
 
     return node;
 }
 
-static int exprTexDumpRecursive(Node_t *node);
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
-int exprTexDump(Node_t *node) {
+int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
 
     int result = 0;
 
-    result += texPrintf("$");
-    result += exprTexDumpRecursive(node);
-    result += texPrintf("$");
+    result += texPrintf(tex, "$$");
+    result += exprTexDumpRecursive(tex, context, node);
+    result += texPrintf(tex, "$$");
 
     return result;
 }
@@ -487,61 +392,160 @@ static bool needBrackets(Node_t *node) {
     if (node->type == OPERATOR) {
         if (!operators[node->value.op].binary) return false;
         if (!node->parent) return false;
-        return (operators[node->parent->value.op].priority > operators[node->value.op].priority);
+        return (operators[node->parent->value.op].opCode == POW || operators[node->parent->value.op].priority > operators[node->value.op].priority);
     }
     return false;
 }
 
-static int exprTexDumpRecursive(Node_t *node) {
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
 
     if (node->type == NUMBER)
-        return texPrintf("%lg", node->value.number);
+        return texPrintf(tex, "%lg", node->value.number);
     if (node->type == VARIABLE)
-        return texPrintf("%s", getVariableName(node->value.var));
+        return texPrintf(tex, "%s", getVariableName(context, node->value.var));
 
     int result = 0;
     if (node->type == OPERATOR) {
         if (operators[node->value.op].binary) {
             if (node->value.op == DIV) {
-                result += texPrintf("\\frac{");
-                result += exprTexDumpRecursive(node->left);
-                result += texPrintf("}{");
-                result += exprTexDumpRecursive(node->right);
-                result += texPrintf("}");
+                result += texPrintf(tex, "\\frac{");
+                result += exprTexDumpRecursive(tex, context, node->left);
+                result += texPrintf(tex, "}{");
+                result += exprTexDumpRecursive(tex, context, node->right);
+                result += texPrintf(tex, "}");
             } else if (node->value.op == POW) {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
-                    result += texPrintf("(");
-                result += exprTexDumpRecursive(node->left);
+                    result += texPrintf(tex, "(");
+                result += exprTexDumpRecursive(tex, context, node->left);
                 if (brackets)
-                    result += texPrintf(")");
-                result += texPrintf("^{");
-                result += exprTexDumpRecursive(node->right);
-                result += texPrintf("}");
+                    result += texPrintf(tex, ")");
+                result += texPrintf(tex, "^{");
+                result += exprTexDumpRecursive(tex, context, node->right);
+                result += texPrintf(tex, "}");
             } else {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
-                    result += texPrintf("(");
-                result += exprTexDumpRecursive(node->left);
+                    result += texPrintf(tex, "(");
+                result += exprTexDumpRecursive(tex, context, node->left);
                 if (brackets)
-                    result += texPrintf(")");
+                    result += texPrintf(tex, ")");
 
-                result += texPrintf("%s", operators[node->value.op].str);
+                result += texPrintf(tex, "%s", operators[node->value.op].str);
 
                 brackets = needBrackets(node->right);
                 if (brackets)
-                    result += texPrintf("(");
-                result += exprTexDumpRecursive(node->right);
+                    result += texPrintf(tex, "(");
+                result += exprTexDumpRecursive(tex, context, node->right);
                 if (brackets)
-                    result += texPrintf(")");
+                    result += texPrintf(tex, ")");
             }
         } else {
-            result += texPrintf("\\%s(", operators[node->value.op].str);
-            result += exprTexDumpRecursive(node->left);
-            result += texPrintf(")");
+            result += texPrintf(tex, "\\%s(", operators[node->value.op].str);
+            result += exprTexDumpRecursive(tex, context, node->left);
+            result += texPrintf(tex, ")");
         }
     }
 
     return result;
+}
+
+/*================PREFIX EQUATION PARSING==============================*/
+//!DEPRECATED
+static Node_t *recursiveParseExpressionPrefix(TungstenContext_t *context, const char **expression);
+
+Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression) {
+    assert(expression);
+    const char *exprCopy = expression;
+    Node_t *exprTree = recursiveParseExpressionPrefix(context, &exprCopy);
+    if (!exprTree) {
+        logPrint(L_ZERO, 1, "Error ocurred here: '%s'\n", exprCopy);
+    }
+    return exprTree;
+}
+
+static const Operator_t *operatorFind(const char *str) {
+    assert(str);
+    for (size_t idx = 0; idx < ARRAY_SIZE(operators); idx++) {
+        if (strcmp(str, operators[idx].str) == 0)
+            return operators + idx;
+    }
+    return NULL;
+}
+
+static enum ElemType scanElement(TungstenContext_t *context, char *buffer, union NodeValue *value) {
+    assert(buffer);
+    assert(value);
+
+    logPrint(L_EXTRA, 0, "Scanning elem '%s'\n", buffer);
+    const Operator_t *op = operatorFind(buffer);
+    if (op != NULL) {
+        value->op = op->opCode;
+        return OPERATOR;
+    }
+
+    size_t elemLen = strlen(buffer);
+
+    size_t scanned = 0;
+    if (sscanf(buffer, "%lg%n", &value->number, &scanned) == 1 && scanned == elemLen) {
+        return NUMBER;
+    }
+
+    value->var = insertVariable(context, buffer);
+    return VARIABLE;
+}
+
+static Node_t *recursiveParseExpressionPrefix(TungstenContext_t *context, const char **expression) {
+    assert(expression);
+    assert(*expression);
+
+    int shift = 0;
+    sscanf(*expression, " ( %n", &shift);
+    if (shift == 0) {
+        logPrint(L_ZERO, 1, "Wrong syntax: no (\n");
+        return NULL;
+    }
+
+    (*expression) += shift;
+    shift = 0;
+
+
+    union NodeValue value = {0};
+
+    char buffer[PARSER_BUFFER_SIZE] = "";
+    sscanf(*expression, " %[^() ] %n", buffer, &shift);
+    (*expression) += shift;
+    shift = 0;
+    enum ElemType type = scanElement(context, buffer, &value);
+
+    Node_t *left = NULL, *right = NULL;
+    switch(type) {
+        case NUMBER:
+        case VARIABLE:
+            break;
+        case OPERATOR:
+            left = recursiveParseExpressionPrefix(context, expression);
+            if (!left) return NULL;
+            if (operators[value.op].binary) {
+                right = recursiveParseExpressionPrefix(context, expression);
+                if (!right) return NULL;
+            }
+
+            break;
+        default:
+            logPrint(L_ZERO, 1, "Unknown element type\n");
+            return NULL;
+    }
+
+    sscanf(*expression, " ) %n", &shift);
+    if (shift == 0) {
+        logPrint(L_ZERO, 1, "Wrong syntax: no )\n");
+        return NULL;
+    }
+
+    (*expression) += shift;
+    shift = 0;
+
+    return createNode(type, value.var, value.number, left, right);
 }

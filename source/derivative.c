@@ -3,10 +3,11 @@
 #include <assert.h>
 #include <stdbool.h>
 
+#include "hashTable.h"
+#include "tex.h"
 #include "logger.h"
 #include "exprTree.h"
 #include "derivative.h"
-#include "nameTable.h"
 
 #include "treeDSL.h"
 
@@ -120,16 +121,16 @@ Node_t *derivativeBase(Node_t *expr, int variable) {
     return NULL;
 }
 
-Node_t *derivative(Node_t *expr, const char *variable) {
+Node_t *derivative(TungstenContext_t *context, Node_t *expr, const char *variable) {
     assert(expr);
     assert(variable);
 
-    int varIdx = findVariable(variable);
+    int varIdx = findVariable(context, variable);
     if (varIdx == NULL_VARIABLE) {
         logPrint(L_ZERO, 1, "Unknown variable '%s'\n", variable);
         return NULL;
     } else {
-        logPrint(L_EXTRA, 0, "Derivative: var = %d, varName = %s\n", varIdx, getVariableName(varIdx));
+        logPrint(L_EXTRA, 0, "Derivative: var = %d, varName = %s\n", varIdx, getVariableName(context, varIdx));
     }
 
     return derivativeBase(expr, varIdx);
@@ -137,3 +138,37 @@ Node_t *derivative(Node_t *expr, const char *variable) {
 
 }
 
+Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
+                        Node_t *expr, const char *variable,
+                        double point, size_t nmemb) {
+
+    Node_t *current = copyTree(expr);
+    current = simplifyExpression(tex, context, current);
+
+    size_t varIdx = findVariable(context, variable);
+    setVariable(context, variable, point);
+
+    double curVal = evaluate(context, current);
+    Node_t *taylor = NUM_(curVal);
+
+    double factorial = 1;
+
+    for (unsigned membPower = 1; membPower < nmemb; membPower++) {
+        Node_t *derived = derivative(context, current, variable);
+        factorial *= membPower;
+        double coefficient = evaluate(context, derived) / factorial;
+
+        taylor = OPR_(ADD, taylor, OPR_(MUL, NUM_(coefficient),
+                                             OPR_(POW, VAR_(varIdx), NUM_(membPower) ) ) );
+
+        deleteTree(current);
+        derived = simplifyExpression(tex, context, derived);
+        current = derived;
+
+    }
+
+    taylor = simplifyExpression(tex, context, taylor);
+
+    deleteTree(current);
+    return taylor;
+}

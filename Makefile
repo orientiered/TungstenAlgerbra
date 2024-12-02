@@ -38,9 +38,9 @@ endif
 #Name of compiled executable
 NAME := ./diff.out
 #Name of directory with headers
-INCLUDEDIRS := include global/include cJson/include
+INCLUDEDIRS := include global/include cJson/include HashTable/include
 
-LINK_LIBS	:= jsonParser
+LINK_LIBS	:= jsonParser hashTable
 
 GLOBAL_SRCS     := $(addprefix global/source/, argvProcessor.cpp logger.cpp utils.cpp)
 GLOBAL_OBJS     := $(subst source,$(OBJDIR), $(GLOBAL_SRCS:%.cpp=%.o))
@@ -55,7 +55,7 @@ LOCAL_OBJS      := $(subst source,$(OBJDIR), $(LOCAL_SRCS:%.c=%.o))
 LOCAL_DEPS      := $(LOCAL_OBJS:%.o=%.d)
 
 #flag to tell compiler where headers are located
-override CFLAGS += $(addprefix -I./,$(INCLUDEDIRS)) -L./cJson/build/
+override CFLAGS += $(addprefix -I./,$(INCLUDEDIRS)) -L./cJson/build/ -L./HashTable/build/
 #Main target to compile executables
 #Filtering other mains from objects
 $(NAME): $(GLOBAL_OBJS) $(LOCAL_OBJS)

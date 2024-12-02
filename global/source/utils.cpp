@@ -121,6 +121,7 @@ void memValSet(void *start, const void *elem, size_t elemSize, size_t length) {
         ptr += elemSize;
     }
 }
+
 // DJB2 hash //link
 uint64_t memHash(const void *arr, size_t len) {
     if (!arr) return 0x1DED0BEDBAD0C0DE;

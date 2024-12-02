@@ -4,15 +4,16 @@
 #include <assert.h>
 #include <string.h>
 
+#include "tex.h"
+#include "hashTable.h"
 #include "logger.h"
 #include "exprTree.h"
 #include "exprParser.h"
-#include "nameTable.h"
 
-Node_t *parseExpression(const char *expression) {
+Node_t *parseExpression(TungstenContext_t *tungstenContext, const char *expression) {
     assert(expression);
     ParseContext_t context = {expression, expression, true};
-    return GetGrammar(&context);
+    return GetGrammar(&context, tungstenContext);
 }
 
 static size_t skipSpaces(ParseContext_t *context) {
@@ -29,9 +30,9 @@ static void movePointer(ParseContext_t *context) {
     skipSpaces(context);
 }
 
-Node_t *GetGrammar(ParseContext_t *context) {
+Node_t *GetGrammar(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     skipSpaces(context);
-    Node_t *val = GetExpr(context);
+    Node_t *val = GetExpr(context, tungstenContext);
     if (!context->success)
         return val;
 
@@ -41,15 +42,15 @@ Node_t *GetGrammar(ParseContext_t *context) {
     } else SyntaxError(context, val, "GetGrammar: Expected '\\0', got '%c'", *context->pointer);
 }
 
-Node_t *GetExpr(ParseContext_t *context) {
-    Node_t *left = GetMulPr(context);
+Node_t *GetExpr(ParseContext_t *context, TungstenContext_t *tungstenContext) {
+    Node_t *left = GetMulPr(context, tungstenContext);
     if (!context->success)
         return left;
 
     while (*context->pointer == '+' || *context->pointer == '-') {
         char op = *context->pointer;
         movePointer(context);
-        Node_t *right = GetMulPr(context);
+        Node_t *right = GetMulPr(context, tungstenContext);
 
         if (!context->success)
             return left;
@@ -60,15 +61,15 @@ Node_t *GetExpr(ParseContext_t *context) {
     return left;
 }
 
-Node_t *GetMulPr(ParseContext_t *context) {
-    Node_t *left = GetPowPr(context);
+Node_t *GetMulPr(ParseContext_t *context, TungstenContext_t *tungstenContext) {
+    Node_t *left = GetPowPr(context, tungstenContext);
     if (!context->success)
         return left;
 
     while (*context->pointer == '*' || *context->pointer == '/') {
         char op = *context->pointer;
         movePointer(context);
-        Node_t *right = GetPowPr(context);
+        Node_t *right = GetPowPr(context, tungstenContext);
 
         if (!context->success)
             return left;
@@ -79,14 +80,14 @@ Node_t *GetMulPr(ParseContext_t *context) {
     return left;
 }
 
-Node_t *GetPowPr(ParseContext_t *context) {
-    Node_t *left = GetPrimary(context);
+Node_t *GetPowPr(ParseContext_t *context, TungstenContext_t *tungstenContext) {
+    Node_t *left = GetPrimary(context, tungstenContext);
     if (!context->success)
         return left;
 
     if (*context->pointer == '^') {
         movePointer(context);
-        Node_t *right = GetPowPr(context);
+        Node_t *right = GetPowPr(context, tungstenContext);
         if (!context->success)
             return left;
 
@@ -96,10 +97,10 @@ Node_t *GetPowPr(ParseContext_t *context) {
     return left;
 }
 
-Node_t *GetPrimary(ParseContext_t *context) {
+Node_t *GetPrimary(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     if (*context->pointer == '(') {
         movePointer(context);
-        Node_t *val = GetExpr(context);
+        Node_t *val = GetExpr(context, tungstenContext);
         if (!context->success)
             return val;
 
@@ -112,13 +113,17 @@ Node_t *GetPrimary(ParseContext_t *context) {
         }
     }
 
-    Node_t *val = GetVar(context);
-    if (context->success)
-        return val;
-    else
-        context->success = true;
+    Node_t *val = GetFunc(context, tungstenContext);
 
-    val = GetNum(context);
+    if (context->success) return val;
+    else context->success = true;
+
+    val = GetVar(context, tungstenContext);
+
+    if (context->success) return val;
+    else context->success = true;
+
+    val = GetNum(context, tungstenContext);
     if (!context->success)
         SyntaxError(context, val, "GetPrimary: expected (expr), 'x', or Number, got neither\n");
 
@@ -126,30 +131,67 @@ Node_t *GetPrimary(ParseContext_t *context) {
 
 }
 
-Node_t *GetVar(ParseContext_t *context) {
-    char buffer[MAX_VARIABLE_LEN] = "";
+Node_t *GetFunc(ParseContext_t *context, TungstenContext_t *tungstenContext) {
+    const char *current = context->pointer;
+    Operator_t op = operators[ADD];
+    if (strncmp(current, "sin", 3) == 0) {
+        op = operators[SIN];
+    } else if (strncmp(current, "cos", 3) == 0) {
+        op = operators[COS];
+    } else if (strncmp(current, "tg", 2) == 0) {
+        op = operators[TAN];
+    } else if (strncmp(current, "ctg", 3) == 0) {
+        op = operators[CTG];
+    } else if (strncmp(current, "ln", 2) == 0) {
+        op = operators[LOGN];
+    } else {
+        context->success = false;
+        return NULL;
+    }
+
+    context->pointer += strlen(op.str);
+    if (*context->pointer != '(') {
+        SyntaxError(context, NULL, "GetFunc: expected '(' but found '%c'\n", *current);
+    }
+    movePointer(context);
+    Node_t *val = GetExpr(context, tungstenContext);
+
+    if (!context->success)
+        return val;
+
+    if (*context->pointer != ')') {
+        SyntaxError(context, NULL, "GetFunc: expected ')' but found '%c'\n", *current);
+    }
+    movePointer(context);
+
+    return createNode(OPERATOR, op.opCode, 0, val, NULL);
+}
+
+Node_t *GetVar(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     const char *current = context->pointer;
 
-    if ('a' <= *current && *current <= 'z' || *current == '_') {
+    if (('a' <= *current && *current <= 'z') || *current == '_') {
         current++;
     } else {
         context->success = false;
         return NULL;
     }
 
-    while ('a' <= *current && *current <= 'z' ||
-           '0' <= *current && *current <= '9' ||
+    while (('a' <= *current && *current <= 'z') ||
+           ('0' <= *current && *current <= '9') ||
            '_' == *current)
         current++;
 
-    strncpy(buffer, context->pointer, (size_t)(current - context->pointer));
-    size_t varIdx = insertVariable(buffer);
+    size_t varNameLen = (size_t)(current - context->pointer);
+    char buffer[MAX_VARIABLE_LEN] = "";
+    strncpy(buffer, context->pointer, (varNameLen <  MAX_VARIABLE_LEN) ? varNameLen : MAX_VARIABLE_LEN - 1);
+    size_t varIdx = insertVariable(tungstenContext, buffer);
     context->pointer = current;
     skipSpaces(context);
     return createNode(VARIABLE, varIdx, 0, NULL, NULL);
 }
 
-Node_t *GetNum(ParseContext_t *context) {
+Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     int num = 0;
 
     if (*context->pointer < '0' || *context->pointer > '9') {

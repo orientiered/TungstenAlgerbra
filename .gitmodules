@@ -1,3 +1,6 @@
 [submodule "cJson"]
 	path = cJson
 	url = https://github.com/orientiered/cJson.git
+[submodule "HashTable"]
+	path = HashTable
+	url = git@github.com:orientiered/HashTable.git

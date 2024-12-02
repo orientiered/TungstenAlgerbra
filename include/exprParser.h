@@ -16,8 +16,9 @@ Expr   ::=MulPr{ ['+''-']  MulPr}*
 MulPr  ::=PowPr{ ['*''/']  PowPr}*
 PowPr  ::=Primary{ '^'  PowPr}?
 
-Primary::= '(' Expr ')' | Var | Num
+Primary::= '(' Expr ')' | Func | Var | Num
 
+Func   ::=["sin" "cos" "tg" "ctg" "ln"]'(' Expr ')'
 Var    ::=['a'-'z''_']+ ['a'-'z''_''0'-'9']*
 Num    ::=['0'-'9']+
 */
@@ -31,12 +32,14 @@ Num    ::=['0'-'9']+
         return ret;                                                         \
     } while(0)
 
-Node_t *GetGrammar(ParseContext_t *context);
-Node_t *GetExpr(ParseContext_t *context);
-Node_t *GetMulPr(ParseContext_t *context);
-Node_t *GetPowPr(ParseContext_t *context);
+Node_t *GetGrammar(ParseContext_t *context, TungstenContext_t *tungstenContext);
+Node_t *GetExpr(ParseContext_t *context, TungstenContext_t *tungstenContext);
+Node_t *GetMulPr(ParseContext_t *context, TungstenContext_t *tungstenContext);
+Node_t *GetPowPr(ParseContext_t *context, TungstenContext_t *tungstenContext);
 
-Node_t *GetPrimary(ParseContext_t *context);
-Node_t *GetVar(ParseContext_t *context);
-Node_t *GetNum(ParseContext_t *context);
+Node_t *GetPrimary(ParseContext_t *context, TungstenContext_t *tungstenContext);
+
+Node_t *GetFunc(ParseContext_t *context, TungstenContext_t *tungstenContext);
+Node_t *GetVar(ParseContext_t *context, TungstenContext_t *tungstenContext);
+Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext);
 #endif

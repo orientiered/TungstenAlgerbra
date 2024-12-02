@@ -6,44 +6,63 @@
 #include "logger.h"
 #include "tex.h"
 
-static FILE *texFile = NULL;
-
-enum TexStatus texInit(const char *name) {
-    if (texFile) {
-        logPrint(L_ZERO, 1, "Tex file is already opened\n");
-        return TEX_SUCCESS;
-    }
-
+TexContext_t texInit(const char *name) {
+    TexContext_t tex = {};
     if (name)
-        texFile = fopen(name, "w");
+        strncpy(tex.fileName, name, TEX_MAX_FILENAME_SIZE-1);
     else
-        texFile = fopen(DEFAULT_TEX_FILE_NAME, "w");
+        strncpy(tex.fileName, DEFAULT_TEX_FILE_NAME, TEX_MAX_FILENAME_SIZE-1);
 
-    if (!texFile) {
+    tex.file = fopen(tex.fileName, "w");
+
+    if (!tex.file) {
         logPrint(L_ZERO, 1, "Failed to open tex file\n");
-        return TEX_NO_FILE;
+        tex.status = TEX_NO_FILE;
+        return tex;
     }
 
+    texPrintf(&tex,
+    "\\documentclass[11pt]{article}\n"
+    "\\usepackage[utf8x]{inputenc}\n"
+    "\\usepackage[russian]{babel}\n"
+    "\\usepackage{multicol}\n"
+    "\\usepackage{graphicx}\n"
+    "\\usepackage[usenames]{color}\n"
+    "\\usepackage{xcolor}\n"
+    "\\usepackage[russian]{babel}\n"
+    "\\usepackage{amsmath, amsfonts, amssymb, amsthm, mathtools, mwe, gensymb}\n"
+    );
 
-    // texPrintf()
+    texPrintf(&tex,
+    "\\title{Пособие по дифференциальному исчислению}\n"
+    "\\author{Лев Толстой}\n"
+    "\\begin{document}\n"
+    "\\maketitle\n"
+    );
 
-    return TEX_SUCCESS;
+    tex.status = TEX_SUCCESS;
+    return tex;
 }
 
-int texPrintf(const char *fmt, ...) {
+int texPrintf(TexContext_t *tex, const char *fmt, ...) {
+    if (!tex->file) return -1;
     va_list args;
     va_start(args, fmt);
-    int result = vfprintf(texFile, fmt, args);
+    int result = vfprintf(tex->file, fmt, args);
     va_end(args);
     return result;
 }
 
-enum TexStatus texClose() {
-    if (!texFile) {
+enum TexStatus texClose(TexContext_t *tex) {
+    if (!tex->file) {
         logPrint(L_ZERO, 1, "No tex file to close\n");
         return TEX_NO_FILE;
     }
 
-    fclose(texFile);
+    texPrintf(tex, "\\end{document}\n");
+    fclose(tex->file);
+    char command[TEX_COMMAND_BUFFER_SIZE] = "";
+    sprintf(command, "pdflatex %s", tex->fileName);
+    system(command);
     return TEX_SUCCESS;
 }

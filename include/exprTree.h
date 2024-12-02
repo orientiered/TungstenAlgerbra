@@ -14,7 +14,7 @@ const char * const DEFAULT_NODE_COLOR   = "#000000";
 const size_t DUMP_BUFFER_SIZE = 128;
 const size_t PARSER_BUFFER_SIZE = 32;
 
-const double DOUBLE_EPSILON = 1e-7; //epsilon for comparing doubles
+const double DOUBLE_EPSILON = 1e-12; //epsilon for comparing doubles
 
 enum ElemType {
     OPERATOR,
@@ -47,7 +47,7 @@ const Operator_t operators[] = {
     {ADD, 1, "+"   , 0},
     {SUB, 1, "-"   , 0},
     {MUL, 1, "*"   , 1},
-    {DIV, 1, "/"   , 2}, // \frac{}{},
+    {DIV, 1, "/"   , 2},
     {POW, 1, "^"   , 2},
     {SIN, 0, "sin" , 3},
     {COS, 0, "cos" , 3},
@@ -64,6 +64,27 @@ typedef enum TungstenStatus_t {
     TA_NULL_PTR,
     TA_DUMP_ERROR
 } TungstenStatus_t;
+
+/*========Nametables==============*/
+const double defaultVariableValue = 0.0;
+const size_t VARIABLE_TABLE_SIZE = 64;
+const size_t MAX_VARIABLE_LEN   = 64;
+
+const int NULL_VARIABLE = -1;
+
+typedef struct {
+    double number;
+    char *str;
+} variable_t;
+
+/*================================*/
+
+typedef struct {
+    // TexContext_t tex;
+    hashTable_t variablesTable;
+    variable_t variables[VARIABLE_TABLE_SIZE];
+    size_t variablesCount;
+} TungstenContext_t;
 
 union NodeValue {
     double number;        ///< Floating point number
@@ -82,6 +103,8 @@ typedef struct Node_t {
     Node_t *right;
 } Node_t;
 
+TungstenContext_t TungstenCtor();
+TungstenStatus_t TungstenDtor(TungstenContext_t *context);
 
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right);
 TungstenStatus_t deleteTree(Node_t *node);
@@ -90,31 +113,47 @@ Node_t *copyTree(Node_t *node);
 
 
 TungstenStatus_t verifyTree(Node_t *node);
-TungstenStatus_t dumpTree(Node_t *node, bool minified);
+TungstenStatus_t dumpTree(TungstenContext_t *context, Node_t *node, bool minified);
 
-int exprTexDump(Node_t *node);
+int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
-Node_t *parseExpressionPrefix(const char *expression);
+Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression);
 
 //Parse expression written if natural mathematical way
-Node_t *parseExpression(const char *expression);
+Node_t *parseExpression(TungstenContext_t *context, const char *expression);
 
-double evaluate(Node_t *node, bool *usedVariable);
+double evaluate(TungstenContext_t *context, Node_t *node);
 
 /// @brief Fold constants in tree.
-/// !NOTE: Do not assign return value of this function, all simplifications are done inplace
 Node_t *foldConstants(Node_t *node, bool *changedTree);
 
+/// @brief Remove neutral operations such as *1, +0, ^1, etc.
 Node_t *removeNeutralOperations(Node_t *node, bool *changedTree);
 
-Node_t *simplifyExpression(Node_t *node);
+/// @brief Combine foldConstants() and removeNeutralOperations() while tree can be simplified
+Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
+
+
+/*=====================NameTable functions==========================*/
+size_t insertVariable(TungstenContext_t *tungsten, const char *buffer);
+
+int findVariable(TungstenContext_t *tungsten, const char *variableName);
+
+void setVariable(TungstenContext_t *tungsten, const char *variableName, double value);
+
+double getVariable(TungstenContext_t *tungsten, int varIdx);
+
+const char *getVariableName(TungstenContext_t *tungsten, int varIdx);
+
+double getVariableByName(TungstenContext_t *tungsten, const char *variableName);
+/*===================================================================*/
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)
 
-#define DUMP_TREE(node, minified) \
+#define DUMP_TREE(context, node, minified) \
     logPrint(L_ZERO, 0, "<h2>Node_t dump called from %s:%d %s</h2>\n", __FILE__, __LINE__, __PRETTY_FUNCTION__); \
-    dumpTree(node, minified);
+    dumpTree(context, node, minified);
 
 #else
 
