@@ -35,6 +35,13 @@ int main() {
     Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", 0, 8);
     exprTexDump(&tex, &context, taylor);
 
+    texBeginGraph(&tex);
+    for (double xCoord = -10; xCoord < 10; xCoord += 0.05) {
+        setVariable(&context, "x", xCoord);
+        texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
+    }
+    texEndGraph(&tex);
+
     deleteTree(taylor);
     deleteTree(expr);
     deleteTree(diff);

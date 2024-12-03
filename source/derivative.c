@@ -158,8 +158,16 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
         factorial *= membPower;
         double coefficient = evaluate(context, derived) / factorial;
 
-        taylor = OPR_(ADD, taylor, OPR_(MUL, NUM_(coefficient),
-                                             OPR_(POW, VAR_(varIdx), NUM_(membPower) ) ) );
+        taylor = OPR_(ADD,
+                        taylor,
+                        OPR_(MUL,
+                                NUM_(coefficient),
+                                OPR_(POW,
+                                        VAR_(varIdx),
+                                        NUM_(membPower)
+                                    )
+                            )
+                     );
 
         deleteTree(current);
         derived = simplifyExpression(tex, context, derived);

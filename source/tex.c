@@ -30,6 +30,8 @@ TexContext_t texInit(const char *name) {
     "\\usepackage[usenames]{color}\n"
     "\\usepackage{xcolor}\n"
     "\\usepackage[russian]{babel}\n"
+    "\\usepackage{pgfplots}\n"
+    "\\pgfplotsset{compat=1.9}\n"
     "\\usepackage{amsmath, amsfonts, amssymb, amsthm, mathtools, mwe, gensymb}\n"
     );
 
@@ -51,6 +53,29 @@ int texPrintf(TexContext_t *tex, const char *fmt, ...) {
     int result = vfprintf(tex->file, fmt, args);
     va_end(args);
     return result;
+}
+
+int texBeginGraph(TexContext_t *tex) {
+    if (!tex->file) return -1;
+    return fprintf(tex->file,
+    "\n\\begin{tikzpicture}\n"
+    "\\pgfplotsset{grid = both}\n"
+    "\\begin{axis}\n"
+    "\\addplot coordinates {\n"
+    );
+}
+
+int texEndGraph(TexContext_t *tex) {
+    if (!tex->file) return -1;
+    return fprintf(tex->file,
+    "};\n"
+    "\\end{axis}\n"
+    "\\end{tikzpicture}\n"
+    );
+}
+
+int texAddCoordinates(TexContext_t *tex, double x, double y) {
+    return fprintf(tex->file, "(%.5lg, %.5lg) ", x, y);
 }
 
 enum TexStatus texClose(TexContext_t *tex) {

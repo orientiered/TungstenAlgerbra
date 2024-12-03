@@ -46,7 +46,7 @@ typedef struct {
 const Operator_t operators[] = {
     {ADD, 1, "+"   , 0},
     {SUB, 1, "-"   , 0},
-    {MUL, 1, "*"   , 1},
+    {MUL, 1, "\\cdot "   , 1},
     {DIV, 1, "/"   , 2},
     {POW, 1, "^"   , 2},
     {SIN, 0, "sin" , 3},

@@ -358,13 +358,18 @@ Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
 Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     bool changedTree = false;
     do {
-        exprTexDump(tex, context, node);
-        texPrintf(tex, " = ");
+        Node_t *copy = copyTree(node);
         changedTree = false;
         node = foldConstants(node, &changedTree);
         node = removeNeutralOperations(node, &changedTree);
-        exprTexDump(tex, context, node);
-        texPrintf(tex, "\n\n");
+        if (changedTree) {
+            texPrintf(tex, "Упростим выражение:\n\n");
+            exprTexDump(tex, context, copy);
+            texPrintf(tex, " = ");
+            exprTexDump(tex, context, node);
+            texPrintf(tex, "\n\n");
+        }
+        deleteTree(copy);
     } while (changedTree);
 
     return node;
@@ -377,21 +382,27 @@ int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
 
     int result = 0;
 
-    result += texPrintf(tex, "$$");
+    result += texPrintf(tex, "$");
     result += exprTexDumpRecursive(tex, context, node);
-    result += texPrintf(tex, "$$");
+    result += texPrintf(tex, "$");
 
     return result;
 }
 
 static bool needBrackets(Node_t *node) {
     assert(node);
-    if (node->type == NUMBER || node->type == VARIABLE)
+    if (!node->parent)
         return false;
+
+    if (node->type == VARIABLE)
+        return false;
+
+    if (node->type == NUMBER)
+        return node->value.number < 0;
 
     if (node->type == OPERATOR) {
         if (!operators[node->value.op].binary) return false;
-        if (!node->parent) return false;
+
         return (operators[node->parent->value.op].opCode == POW || operators[node->parent->value.op].priority > operators[node->value.op].priority);
     }
     return false;
@@ -401,7 +412,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
     assert(node);
 
     if (node->type == NUMBER)
-        return texPrintf(tex, "%lg", node->value.number);
+        return texPrintf(tex, "%.4lg", node->value.number);
     if (node->type == VARIABLE)
         return texPrintf(tex, "%s", getVariableName(context, node->value.var));
 

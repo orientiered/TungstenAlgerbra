@@ -23,5 +23,9 @@ TexContext_t texInit(const char *name);
 int texPrintf(TexContext_t *tex, const char *fmt, ...);
 enum TexStatus texClose(TexContext_t *tex);
 
+int texBeginGraph(TexContext_t *tex);
+int texEndGraph(TexContext_t *tex);
+int texAddCoordinates(TexContext_t *tex, double x, double y);
+
 
 #endif
