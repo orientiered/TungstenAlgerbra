@@ -13,6 +13,7 @@ typedef struct {
     char fileName[TEX_MAX_FILENAME_SIZE];
     FILE *file;
 
+    bool active;
     enum TexStatus status;
 } TexContext_t;
 
@@ -26,6 +27,11 @@ enum TexStatus texClose(TexContext_t *tex);
 int texBeginGraph(TexContext_t *tex);
 int texEndGraph(TexContext_t *tex);
 int texAddCoordinates(TexContext_t *tex, double x, double y);
+
+int texBeginTable(TexContext_t *tex, unsigned columns);
+int texEndTable(TexContext_t *tex);
+int texAddTableLine(TexContext_t *tex, bool hLine, unsigned columns, ...);
+
 
 
 #endif

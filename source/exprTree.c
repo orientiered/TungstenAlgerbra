@@ -410,7 +410,6 @@ static bool needBrackets(Node_t *node) {
 
 static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
-
     if (node->type == NUMBER)
         return texPrintf(tex, "%.4lg", node->value.number);
     if (node->type == VARIABLE)
@@ -453,9 +452,13 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
                     result += texPrintf(tex, ")");
             }
         } else {
-            result += texPrintf(tex, "\\%s(", operators[node->value.op].str);
+            result += texPrintf(tex, "\\%s ", operators[node->value.op].str);
+            bool brackets = needBrackets(node->left);
+            if (brackets)
+                result += texPrintf(tex, "(");
             result += exprTexDumpRecursive(tex, context, node->left);
-            result += texPrintf(tex, ")");
+            if (brackets)
+                result += texPrintf(tex, ")");
         }
     }
 

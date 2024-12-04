@@ -25,103 +25,145 @@ static bool hasVariable(Node_t *node, int variable) {
 
 
 /*=======DSL FOR DERIVATIVES==================*/
-#define dL_ derivativeBase(expr->left, variable)
-#define dR_ derivativeBase(expr->right, variable)
+#define dL_ derivativeBase(tex, context, expr->left, variable)
+#define dR_ derivativeBase(tex, context, expr->right, variable)
 #define cL_ copyTree(expr->left)
 #define cR_ copyTree(expr->right)
+
+#define RETURN(node) \
+    do {                                    \
+        exprTexDump(tex, context, node);    \
+        texPrintf(tex, "\n\n");             \
+        return node;                        \
+    } while(0)
+
+static Node_t *derivativeOperator(TexContext_t *tex, TungstenContext_t *context, Node_t *expr, int variable) {
+    assert(tex);
+    assert(context);
+    assert(expr);
+
+    Node_t *result = NULL;
+
+    switch(expr->value.op) {
+        case ADD:
+            result = OPR_(ADD, dL_, dR_);
+            break;
+        case SUB:
+            result = OPR_(SUB, dL_, dR_);
+            break;
+        case MUL:
+            result = OPR_(ADD, OPR_(MUL, dL_, cR_),
+                                OPR_(MUL, cL_, dR_));
+            break;
+        case DIV:
+        {
+            Node_t *nominator = OPR_(SUB, OPR_(MUL, dL_, cR_),
+                                            OPR_(MUL, cL_, dR_));
+            Node_t *denominator = OPR_(POW, cR_, NUM_(2));
+            result = OPR_(DIV, nominator, denominator);
+            break;
+        }
+        case POW:
+        {
+            //base ^ power
+            logPrint(L_EXTRA, 0, "Derivative: pow operator\n");
+            bool noVarBase  = !hasVariable(expr->left, variable);
+            bool noVarPower = !hasVariable(expr->right, variable);
+            logPrint(L_EXTRA, 0, "Derivative: noVarBase = %d, noVarPower = %d\n", noVarBase, noVarPower);
+
+            if (noVarPower) {
+                if (noVarBase)
+                    result = NUM_(0);
+                else
+                    // d(f^n) = d(f)*n*f^(n-1)
+                    result = OPR_(MUL, OPR_(MUL, dL_, cR_),
+                                       OPR_(POW, cL_, OPR_(SUB, cR_, NUM_(1)) ) );
+            } else {
+                if (noVarBase) {
+                    //d(a^f) = a^f * ln(a) * d(f)
+                    result = OPR_(MUL, OPR_(MUL, copyTree(expr), dR_),
+                                        OPR_(LOGN, cL_, NULL) );
+                } else {
+                    //d(g^f) = d( e^(f*ln(g)) ) = g^f * d( f*ln(g) ) = g^f * (df*ln(g) + f*dg/g)
+                    Node_t *tempTree = OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) );
+
+                    Node_t *answer = OPR_(MUL, copyTree(expr), derivativeBase(tex, context, tempTree, variable) );
+
+                    deleteTree(tempTree);
+                    result = answer;
+                }
+            }
+            break;
+        }
+        case SIN:
+            result = OPR_(MUL, OPR_(COS, cL_, NULL), dL_);
+            break;
+        case COS:
+            result = OPR_(MUL, OPR_(SIN, cL_, NULL),
+                                OPR_(MUL, NUM_(-1), dL_));
+            break;
+        case TAN:
+            result = OPR_(DIV, dL_,
+                                OPR_(POW, OPR_(COS, cL_, NULL), NUM_(2) ) );
+            break;
+        case CTG:
+            result = OPR_(DIV, OPR_(MUL, NUM_(-1), dL_),
+                                OPR_(POW, OPR_(SIN, cL_, NULL), NUM_(2) ) );
+            break;
+        case LOG:
+            result = OPR_(DIV, dR_,
+                                OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) ) );
+            break;
+        case LOGN:
+            result = OPR_(DIV, dL_, cL_);
+            break;
+        default:
+            logPrint(L_ZERO, 1, "Unknown operator type %d\n", expr->value.op);
+            break;
+    }
+
+    return result;
+}
 
 /// @brief Create derivative of expr with respect to variable
 /// @param expr expression tree
 /// @param variable derivative variable
 /// @return Derivative tree
-Node_t *derivativeBase(Node_t *expr, int variable) {
+Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *expr, int variable) {
+    texPrintf(tex, "Нужно найти производную выражения: ");
+    exprTexDump(tex, context, expr);
+    texPrintf(tex, "\n\n");
+
+    Node_t *result = NULL;
     switch (expr->type) {
         case VARIABLE:
             if (expr->value.var == variable)
-                return NUM_(1);
+                result = NUM_(1);
             else
-                return NUM_(0);
+                result = NUM_(0);
+
+            break;
         case NUMBER:
-            return NUM_(0);
+            result = NUM_(0);
+            break;
         case OPERATOR:
-        {
-            switch(expr->value.op) {
-                case ADD:
-                    return OPR_(ADD, dL_, dR_);
-                case SUB:
-                    return OPR_(SUB, dL_, dR_);
-                case MUL:
-                    return OPR_(ADD, OPR_(MUL, dL_, cR_),
-                                     OPR_(MUL, cL_, dR_));
-                case DIV:
-                {
-                    Node_t *nominator = OPR_(SUB, OPR_(MUL, dL_, cR_),
-                                                  OPR_(MUL, cL_, dR_));
-                    Node_t *denominator = OPR_(POW, cR_, NUM_(2));
-                    return OPR_(DIV, nominator, denominator);
-                }
-                case POW:
-                {
-                    //base ^ power
-                    logPrint(L_EXTRA, 0, "Derivative: pow operator\n");
-                    bool noVarBase  = !hasVariable(expr->left, variable);
-                    bool noVarPower = !hasVariable(expr->right, variable);
-                    logPrint(L_EXTRA, 0, "Derivative: noVarBase = %d, noVarPower = %d\n", noVarBase, noVarPower);
-
-                    if (noVarPower) {
-                        if (noVarBase)
-                            return NUM_(0);
-                        else
-                            // d(f^n) = d(f)*n*f^(n-1)
-                            return OPR_(MUL, OPR_(MUL, dL_, cR_),
-                                             OPR_(POW, cL_, OPR_(SUB, cR_, NUM_(1)) ) );
-                    } else {
-                        if (noVarBase) {
-                            //d(a^f) = a^f * ln(a) * d(f)
-                            return OPR_(MUL, OPR_(MUL, copyTree(expr), dR_),
-                                             OPR_(LOGN, cL_, NULL) );
-                        } else {
-                            //d(g^f) = d( e^(f*ln(g)) ) = g^f * d( f*ln(g) ) = g^f * (df*ln(g) + f*dg/g)
-                            Node_t *tempTree = OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) );
-
-                            Node_t *answer = OPR_(MUL, copyTree(expr), derivativeBase(tempTree, variable));
-
-                            deleteTree(tempTree);
-                            return answer;
-                        }
-                    }
-
-                }
-                case SIN:
-                    return OPR_(MUL, OPR_(COS, cL_, NULL), dL_);
-                case COS:
-                    return OPR_(MUL, OPR_(SIN, cL_, NULL),
-                                     OPR_(MUL, NUM_(-1), dL_));
-                case TAN:
-                    return OPR_(DIV, dL_,
-                                     OPR_(POW, OPR_(COS, cL_, NULL), NUM_(2) ) );
-                case CTG:
-                    return OPR_(DIV, OPR_(MUL, NUM_(-1), dL_),
-                                     OPR_(POW, OPR_(SIN, cL_, NULL), NUM_(2) ) );
-                case LOG:
-                    return OPR_(DIV, dR_,
-                                     OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) ) );
-                case LOGN:
-                    return OPR_(DIV, dL_, cL_);
-                default:
-                    logPrint(L_ZERO, 1, "Unknown operator type %d\n", expr->value.op);
-                    break;
-            }
-        }
-        break;
+            result = derivativeOperator(tex, context, expr, variable);
+            break;
         default:
             logPrint(L_ZERO, 1, "Unknown expression type %d\n", expr->type);
             break;
     }
-    return NULL;
+
+    texPrintf(tex, "(");
+    exprTexDump(tex, context, expr);
+    texPrintf(tex, ")' = ");
+    exprTexDump(tex, context, result);
+    texPrintf(tex, "\n\n");
+
+    return result;
 }
 
-Node_t *derivative(TungstenContext_t *context, Node_t *expr, const char *variable) {
+Node_t *derivative(TexContext_t *tex, TungstenContext_t *context, Node_t *expr, const char *variable) {
     assert(expr);
     assert(variable);
 
@@ -133,9 +175,7 @@ Node_t *derivative(TungstenContext_t *context, Node_t *expr, const char *variabl
         logPrint(L_EXTRA, 0, "Derivative: var = %d, varName = %s\n", varIdx, getVariableName(context, varIdx));
     }
 
-    return derivativeBase(expr, varIdx);
-
-
+    return derivativeBase(tex, context, expr, varIdx);
 }
 
 Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
@@ -144,6 +184,9 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
 
     Node_t *current = copyTree(expr);
     current = simplifyExpression(tex, context, current);
+    texPrintf(tex, "Оттейлорим функцию ");
+    exprTexDump(tex, context, current);
+    texPrintf(tex, "\n\n");
 
     size_t varIdx = findVariable(context, variable);
     setVariable(context, variable, point);
@@ -151,12 +194,29 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
     double curVal = evaluate(context, current);
     Node_t *taylor = NUM_(curVal);
 
+    //TODO: 64 -> constant
+    char firstCol[64] = "", secondCol[64] = "";
+
+    texBeginTable(tex, 2);
+    sprintf(firstCol, "$f(%lg)$", point);
+    sprintf(secondCol, "$%lg$", curVal);
+    texAddTableLine(tex, true, 2, firstCol, secondCol);
+
     double factorial = 1;
 
     for (unsigned membPower = 1; membPower < nmemb; membPower++) {
-        Node_t *derived = derivative(context, current, variable);
+        tex->active = false;
+        Node_t *derived = derivative(tex, context, current, variable);
+        tex->active = true;
+
+        curVal = evaluate(context, derived);
+
+        sprintf(firstCol, "$f^{(%d)}(%lg)$", membPower, point);
+        sprintf(secondCol, "$%lg$", curVal);
+        texAddTableLine(tex, membPower != (nmemb - 1), 2, firstCol, secondCol);
+
         factorial *= membPower;
-        double coefficient = evaluate(context, derived) / factorial;
+        double coefficient = curVal / factorial;
 
         taylor = OPR_(ADD,
                         taylor,
@@ -170,12 +230,23 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
                      );
 
         deleteTree(current);
+        tex->active = false;
         derived = simplifyExpression(tex, context, derived);
+        tex->active = true;
+
         current = derived;
 
     }
 
+    tex->active = false;
     taylor = simplifyExpression(tex, context, taylor);
+    tex->active = true;
+
+    texEndTable(tex);
+
+    texPrintf(tex, " Имеем $f(x) = $");
+    exprTexDump(tex, context, taylor);
+    texPrintf(tex, "$ + o(x^%d)$\n\n", nmemb - 1);
 
     deleteTree(current);
     return taylor;

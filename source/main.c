@@ -22,15 +22,15 @@ int main() {
     Node_t *expr = parseExpression(&context, exprStr);
     DUMP_TREE(&context, expr, true);
 
-
+    texPrintf(&tex, "Дано:\n\n");
     exprTexDump(&tex, &context, expr);
     texPrintf(&tex, "\n\n");
 
-    exprTexDump(&tex, &context, expr);
-    Node_t *diff = derivative(&context, expr, "x");
-    exprTexDump(&tex, &context, diff);
+    // exprTexDump(&tex, &context, expr);
+    Node_t *diff = derivative(&tex, &context, expr, "x");
+    // exprTexDump(&tex, &context, diff);
     diff = simplifyExpression(&tex, &context, diff);
-    exprTexDump(&tex, &context, diff);
+    // exprTexDump(&tex, &context, diff);
 
     Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", 0, 8);
     exprTexDump(&tex, &context, taylor);
@@ -41,6 +41,15 @@ int main() {
         texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
     }
     texEndGraph(&tex);
+    // printf("'%s'\n", exprStr);
+    // texPrintf(&tex,
+    // "\n\n\\begin{tikzpicture}\n"
+    // "\\begin{axis}\n"
+    // "\\addplot[blue] {%s};\n"
+    // "\\end{axis}\n"
+    // "\\end{tikzpicture}\n",
+    // exprStr);
+
 
     deleteTree(taylor);
     deleteTree(expr);
