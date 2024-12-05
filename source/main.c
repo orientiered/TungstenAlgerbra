@@ -51,7 +51,7 @@ int main(int argc, const char *argv[]) {
         for (double xCoord = -10; xCoord < 10; xCoord += 0.05) {
             setVariable(&context, "x", xCoord);
             double yCoord = evaluate(&context, expr);
-            if (fabs(yCoord) < 100)
+            if (fabs(yCoord) < 10)
                 texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
         }
         texEndGraph(&tex);
@@ -66,3 +66,4 @@ int main(int argc, const char *argv[]) {
     free(exprStr);
     return 0;
 }
+

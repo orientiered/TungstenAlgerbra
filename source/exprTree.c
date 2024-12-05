@@ -17,7 +17,7 @@
 
 #define CALLOC(size, type) (type *) calloc((size), sizeof(type))
 
-static double calculateOperation(enum OperatorType op, double left, double right) {
+double calculateOperation(enum OperatorType op, double left, double right) {
     switch(op) {
         case ADD:
             return left + right;
@@ -231,286 +231,27 @@ TungstenStatus_t deleteTree(Node_t *node) {
     return TA_SUCCESS;
 }
 
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node, Node_t *subst);
 
-/*===========Tree simplification================================*/
-
-Node_t *foldConstants(Node_t *node, bool *changedTree) {
-    if (node->type == NUMBER || node->type == VARIABLE) {
-        return node;
-    }
-
-    assert(node->type == OPERATOR);
-
-    if (!operators[node->value.op].commutative) {
-        Node_t *left = NULL, *right = NULL;
-        bool binary = operators[node->value.op].binary;
-
-        left = foldConstants(node->left, changedTree);
-        if (binary)
-            right = foldConstants(node->right, changedTree);
-
-        if (left->type == NUMBER && (!binary ||  right->type == NUMBER) ) {
-            if (changedTree)
-                *changedTree = true;
-            node->value.number = calculateOperation(node->value.op, left->value.number,
-                                                                    (right) ? (right->value.number) : 0);
-            deleteTree(node->left); node->left = NULL;
-            if (right) {
-                deleteTree(node->right); node->right = NULL;
-            }
-            node->type = NUMBER;
-        }
-    } else {
-        enum OperatorType op = node->value.op;
-
-        //array with leafs of current commutative operation (e.g. + or *)
-        Node_t *operLeafs[EXPR_TREE_MAX_LIST_COUNT] = {0};
-        size_t listCount = 0;
-
-        //array to find lists using depth-first search
-        Node_t *listsStack[EXPR_TREE_MAX_LIST_COUNT] = {0};
-        size_t stackSize = 0;
-
-        //array with nodes of type operator
-        Node_t *operNodes[EXPR_TREE_MAX_LIST_COUNT] = {0};
-        operNodes[0] = node;
-        size_t operNodesCount = 1;
-
-        // Depth-first search
-        listsStack[0] = node->right;
-        listsStack[1] = node->left;
-        stackSize = 2;
-
-        while (stackSize > 0) {
-            stackSize--;
-            Node_t *current = listsStack[stackSize];
-            logPrint(L_EXTRA, 0, "StackSize = %d, current = %p\n", stackSize, current);
-
-            if (current->type != OPERATOR || current->value.op != op) {
-                logPrint(L_EXTRA, 0, "Calling foldConstants for %p: type = %d\n", current->type);
-                current = foldConstants(current, changedTree);
-            }
-
-            if (current->type == OPERATOR && current->value.op == op) {
-                logPrint(L_EXTRA, 0, "Added = %p\n", current->right);
-                logPrint(L_EXTRA, 0, "Added = %p\n", current->left);
-
-                listsStack[stackSize] = current->right;
-                stackSize++;
-                listsStack[stackSize] = current->left;
-                stackSize++;
-
-                operNodes[operNodesCount++] = current;
-            } else {
-                logPrint(L_EXTRA, 0, "Pushed %p to leafs array\n", current);
-
-                operLeafs[listCount++] = current;
-            }
-
-            logPrint(L_EXTRA, 0, "~StackSize = %d, current = %p\n", stackSize, current);
-
-        }
-
-        // simplifying constants and rearranging tree
-        Node_t *numberNode = NULL;
-
-        size_t writeIdx = 0;
-        for (size_t readIdx = 0; readIdx < listCount; readIdx++) {
-            if (operLeafs[readIdx]->type == NUMBER) {
-                if (!numberNode) {
-                    numberNode = operLeafs[readIdx];
-                } else {
-                    *changedTree = true;
-                    numberNode->value.number = calculateOperation(op,
-                                                                  numberNode->value.number,
-                                                                  operLeafs[readIdx]->value.number);
-                    deleteTree(operLeafs[readIdx]);
-                }
-
-            } else {
-                operLeafs[writeIdx++] = operLeafs[readIdx];
-            }
-        }
-
-        listCount = writeIdx;
-        // if all nodes were numbers
-        if (listCount == 0) {
-            node->type = NUMBER;
-            node->value.number = numberNode->value.number;
-            node->left = NULL;
-            node->right = NULL;
-            deleteTree(numberNode);
-            for (size_t operIdx = 1; operIdx < operNodesCount; operIdx++) {
-                free(operNodes[operIdx]);
-            }
-
-            return node;
-        } else {
-            logPrint(L_EXTRA, 0, "Operator leafs: total = %d\n", listCount);
-            for (int i = 0; i < listCount; i++) {
-                logPrint(L_EXTRA, 0, "i=%d : %p : type = %d\n", i, operLeafs[i], operLeafs[i]->type);
-            }
-
-            // if no numbers then no need to change anything
-            if (!numberNode)
-                return operNodes[0];
-
-            logPrint(L_EXTRA, 0, "Rearranging tree\n");
-
-            operNodes[0]->left = numberNode;
-
-            if (listCount == 1) {
-                operNodes[0]->right = operLeafs[0];
-                return operNodes[0];
-            }
-
-            operNodes[0]->right = operNodes[1];
-            size_t operCounter = 1;
-            Node_t *current = operNodes[1];
-
-
-            for (size_t idx = 0; idx < listCount - 1; idx++) {
-                current->left = operLeafs[idx];
-                operLeafs[idx]->parent = current;
-                if (idx == (listCount - 2) )
-                    current->right = operLeafs[idx + 1];
-                else if (operCounter < operNodesCount)
-                    current->right = operNodes[++operCounter];
-                else
-                    current->right = OPR_(op, NULL, NULL);
-
-                current->right->parent = current;
-                current = current->right;
-            }
-
-            for (size_t operIdx = operCounter + 1; operIdx < operNodesCount; operIdx++) {
-                free(operNodes[operIdx]);
-            }
-            //TODO: free left operators
-            return operNodes[0];
-        }
-    }
-
-    return node;
-}
-
-static bool isEqualDouble(double a, double b) {
-    return fabs(b-a) < DOUBLE_EPSILON;
-}
-
-// static linkNode(Node_t *destination, Node_t *source)
-Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
-    assert(node);
-
-    if (node->type == NUMBER || node->type == VARIABLE)
-        return node;
-
-    if (node->left)
-        node->left = removeNeutralOperations(node->left, changedTree);
-
-    if (node->right)
-        node->right = removeNeutralOperations(node->right, changedTree);
-
-    Node_t *result = node;
-    bool leftIsNumber  = (node->left->type == NUMBER);
-    bool rightIsNumber = (node->right && node->right->type == NUMBER);
-
-    bool leftIsZero    = leftIsNumber && isEqualDouble(node->left->value.number, 0);
-    bool leftIsOne     = leftIsNumber && isEqualDouble(node->left->value.number, 1);
-
-    bool rightIsZero   = rightIsNumber && isEqualDouble(node->right->value.number, 0);
-    bool rightIsOne    = rightIsNumber && isEqualDouble(node->right->value.number, 1);
-
-    if (node->type == OPERATOR) {
-        if (node->value.op == ADD) {
-        /*ADDITION*/
-            if (leftIsZero) {
-            // 0 + x = x
-                node->right->parent = node->parent;
-                result = node->right;
-            } else if (rightIsZero) {
-            // x + 0 = 0
-                node->left->parent = node->parent;
-                result = node->left;
-            }
-
-        } else if (node->value.op == SUB) {
-        /*SUBSTRACTION*/
-            if (rightIsZero) {
-            // x - 0 = x
-                node->left->parent = node->parent;
-                result = node->left;
-            }
-        } else if (node->value.op == MUL) {
-        /*MULTIPLICATION*/
-            if (leftIsOne) {
-                node->right->parent = node->parent;
-                result = node->right;
-            } else if (leftIsZero) {
-                node->left->parent = node->parent;
-                result = node->left;
-            } else if (rightIsOne) {
-                node->left->parent = node->parent;
-                result = node->left;
-            } else if (rightIsZero) {
-                node->right->parent = node->parent;
-                result = node->right;
-            }
-
-        } else if (node->value.op == POW) {
-        /*POWER*/
-            if (rightIsOne) {
-            // x ^ 1 = x
-                node->left->parent = node->parent;
-                result = node->left;
-            } else if (rightIsZero) {
-            // x ^ 0 = 1
-                node->right->parent = node->parent;
-                node->right->value.number = 1;
-                result = node->right;
-            } else if (leftIsZero) {
-            //0 ^ x = 0
-                node->left->parent = node->parent;
-                result = node->left;
-            }
-        }
-    }
-
-    if (result != node) {
-        if (changedTree)
-            *changedTree = true;
-        //unlinking result subtree from node to use deleteTree() function
-        if (result == node->left)
-            node->left = NULL;
-        else
-            node->right = NULL;
-
-        deleteTree(node);
-    }
-    return result;
-}
-
-Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
-    bool changedTree = false;
-    do {
-        Node_t *copy = copyTree(node);
-        changedTree = false;
-        node = foldConstants(node, &changedTree);
-        node = removeNeutralOperations(node, &changedTree);
-        if (changedTree) {
-            texPrintf(tex, "Упростим выражение:\n\n");
-            exprTexDump(tex, context, copy);
-            texPrintf(tex, " = ");
-            exprTexDump(tex, context, node);
-            texPrintf(tex, "\n\n");
-        }
-        deleteTree(copy);
-    } while (changedTree);
-
-    return node;
-}
-
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
+// int exprFullTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
+//     Node_t *substitutions[EXPR_TREE_MAX_SUBST_COUNT] = {0};
+//
+//     int result = 0;
+//     result += texPrintf(tex, "$");
+//     result += exprTexDumpRecursive(tex, context, node, substitutions);
+//     result += texPrintf(tex, "$");
+//
+//     Node_t *curSubst = substitutions[0];
+//     if (curSubst)
+//         result += texPrint(tex, "Где ");
+//     while (curSubst) {
+//         result += texPrintf(tex, "$%c = $", curSubst->substitutionSymbol);
+//         result += exprFullTexDump(tex, context, node);
+//         result += texPrintf(tex, ", \n\n");
+//         curSubst++;
+//     }
+//     return result;
+// }
 
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
@@ -518,7 +259,7 @@ int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     int result = 0;
 
     result += texPrintf(tex, "$");
-    result += exprTexDumpRecursive(tex, context, node);
+    result += exprTexDumpRecursive(tex, context, node, NULL);
     result += texPrintf(tex, "$");
 
     return result;
@@ -543,7 +284,15 @@ static bool needBrackets(Node_t *node) {
     return false;
 }
 
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
+static size_t getSubtreeSize(Node_t *node) {
+    if (!node) return 0;
+    if (node->type == VARIABLE || node->type == NUMBER)
+        return 1;
+
+    return getSubtreeSize(node->left) + getSubtreeSize(node->right);
+}
+
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node, Node_t *subst) {
     assert(node);
     if (node->type == NUMBER)
         return texPrintf(tex, "%.4lg", node->value.number);
@@ -551,29 +300,32 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
         return texPrintf(tex, "%s", getVariableName(context, node->value.var));
 
     int result = 0;
+    if (node->isSubstitution)
+        return texPrintf(tex, "%c", node->substitutionSymbol);
+
     if (node->type == OPERATOR) {
         if (operators[node->value.op].binary) {
             if (node->value.op == DIV) {
                 result += texPrintf(tex, "\\frac{");
-                result += exprTexDumpRecursive(tex, context, node->left);
+                result += exprTexDumpRecursive(tex, context, node->left, subst);
                 result += texPrintf(tex, "}{");
-                result += exprTexDumpRecursive(tex, context, node->right);
+                result += exprTexDumpRecursive(tex, context, node->right, subst);
                 result += texPrintf(tex, "}");
             } else if (node->value.op == POW) {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left);
+                result += exprTexDumpRecursive(tex, context, node->left, subst);
                 if (brackets)
                     result += texPrintf(tex, ")");
                 result += texPrintf(tex, "^{");
-                result += exprTexDumpRecursive(tex, context, node->right);
+                result += exprTexDumpRecursive(tex, context, node->right, subst);
                 result += texPrintf(tex, "}");
             } else {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left);
+                result += exprTexDumpRecursive(tex, context, node->left, subst);
                 if (brackets)
                     result += texPrintf(tex, ")");
 
@@ -582,7 +334,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
                 brackets = needBrackets(node->right);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->right);
+                result += exprTexDumpRecursive(tex, context, node->right, subst);
                 if (brackets)
                     result += texPrintf(tex, ")");
             }
@@ -591,7 +343,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
             bool brackets = needBrackets(node->left);
             if (brackets)
                 result += texPrintf(tex, "(");
-            result += exprTexDumpRecursive(tex, context, node->left);
+            result += exprTexDumpRecursive(tex, context, node->left, subst);
             if (brackets)
                 result += texPrintf(tex, ")");
         }

@@ -199,11 +199,14 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
 
     for (unsigned membPower = 1; membPower < nmemb; membPower++) {
         tex->active = false;
-        Node_t *derived = derivative(tex, context, current, variable);
+        Node_t *toDelete = current;
+
+        current = derivative(tex, context, current, variable);
+        deleteTree(toDelete);
         tex->active = true;
 
 
-        curVal = evaluate(context, derived);
+        curVal = evaluate(context, current);
 
         // sprintf(firstCol, "$f^{(%d)}(%lg)$", membPower, point);
         // sprintf(secondCol, "$%lg$", curVal);
@@ -223,21 +226,18 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
                             )
                      );
 
-        deleteTree(current);
         tex->active = false;
-        derived = simplifyExpression(tex, context, derived);
+        current = simplifyExpression(tex, context, current);
         tex->active = true;
-        DUMP_TREE(context, derived, 0);
+        DUMP_TREE(context, current, 0);
         texPrintf(tex, "$f^{(%d)}(x) = $", membPower);
-        exprTexDump(tex, context, derived);
+        exprTexDump(tex, context, current);
         texPrintf(tex, "\n\n");
         texPrintf(tex, "$f^{(%d)}(%lg) = %lg$\n\n", membPower, point, curVal);
-
-        current = derived;
-
     }
 
     // texEndTable(tex);
+    deleteTree(current);
 
 
 
@@ -255,6 +255,5 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
     exprTexDump(tex, context, taylor);
     texPrintf(tex, "$ + o(x^%d)$\n\n", nmemb - 1);
 
-    deleteTree(current);
     return taylor;
 }

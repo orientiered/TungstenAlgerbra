@@ -15,7 +15,7 @@ const size_t DUMP_BUFFER_SIZE = 128;
 const size_t PARSER_BUFFER_SIZE = 32;
 
 const size_t EXPR_TREE_MAX_LIST_COUNT = 64;
-
+const size_t EXPR_TREE_MAX_SUBST_COUNT = 64;
 const double DOUBLE_EPSILON = 1e-12; //epsilon for comparing doubles
 
 enum ElemType {
@@ -103,6 +103,9 @@ typedef struct Node_t {
 
     union NodeValue value;
 
+    bool isSubstitution;
+    char substitutionSymbol;
+
     Node_t *left;
     Node_t *right;
 } Node_t;
@@ -125,6 +128,8 @@ Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression
 
 //Parse expression written if natural mathematical way
 Node_t *parseExpression(TungstenContext_t *context, const char *expression);
+
+double calculateOperation(enum OperatorType op, double left, double right);
 
 double evaluate(TungstenContext_t *context, Node_t *node);
 
