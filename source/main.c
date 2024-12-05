@@ -1,18 +1,23 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <math.h>
 
 #include "hashTable.h"
 #include "logger.h"
+#include "argvProcessor.h"
 #include "tex.h"
 #include "exprTree.h"
 #include "derivative.h"
 #include "treeDSL.h"
 
-int main() {
+int main(int argc, const char *argv[]) {
     logOpen("log.html", L_HTML_MODE);
     setLogLevel(L_EXTRA);
-    logDisableBuffering();
+
+    registerFlag(TYPE_INT, "-t", "--taylor", "Compute taylor expansion");
+    processArgs(argc, argv);
+    // logDisableBuffering();
     TexContext_t tex = texInit("textest.tex");
     TungstenContext_t context = TungstenCtor();
 
@@ -20,7 +25,9 @@ int main() {
     scanf("%m[^\n]", &exprStr);
 
     Node_t *expr = parseExpression(&context, exprStr);
-    DUMP_TREE(&context, expr, true);
+    DUMP_TREE(&context, expr, false);
+    expr = simplifyExpression(&tex, &context, expr);
+    DUMP_TREE(&context, expr, false);
 
     texPrintf(&tex, "Дано:\n\n");
     exprTexDump(&tex, &context, expr);
@@ -28,30 +35,29 @@ int main() {
 
     // exprTexDump(&tex, &context, expr);
     Node_t *diff = derivative(&tex, &context, expr, "x");
-    // exprTexDump(&tex, &context, diff);
+    DUMP_TREE(&context, diff, 0);
+    exprTexDump(&tex, &context, diff);
+    texPrintf(&tex, "\n\n");
     diff = simplifyExpression(&tex, &context, diff);
-    // exprTexDump(&tex, &context, diff);
+    DUMP_TREE(&context, diff, 0);
+    exprTexDump(&tex, &context, diff);
+    texPrintf(&tex, "\n\n");
 
-    Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", 0, 8);
-    exprTexDump(&tex, &context, taylor);
+    if (isFlagSet("-t")) {
+        Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", 0, getFlagValue("-t").int_);
+        // exprTexDump(&tex, &context, taylor);
 
-    texBeginGraph(&tex);
-    for (double xCoord = -10; xCoord < 10; xCoord += 0.05) {
-        setVariable(&context, "x", xCoord);
-        texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
+        texBeginGraph(&tex);
+        for (double xCoord = -10; xCoord < 10; xCoord += 0.05) {
+            setVariable(&context, "x", xCoord);
+            double yCoord = evaluate(&context, expr);
+            if (fabs(yCoord) < 100)
+                texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
+        }
+        texEndGraph(&tex);
+        deleteTree(taylor);
     }
-    texEndGraph(&tex);
-    // printf("'%s'\n", exprStr);
-    // texPrintf(&tex,
-    // "\n\n\\begin{tikzpicture}\n"
-    // "\\begin{axis}\n"
-    // "\\addplot[blue] {%s};\n"
-    // "\\end{axis}\n"
-    // "\\end{tikzpicture}\n",
-    // exprStr);
 
-
-    deleteTree(taylor);
     deleteTree(expr);
     deleteTree(diff);
     texClose(&tex);

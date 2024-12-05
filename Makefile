@@ -23,7 +23,7 @@ CUSTOM_DBG_FLAGS := -D_TREE_DUMP
 
 override CFLAGS := -g -D _DEBUG -ggdb3 -std=c++17 -O0 $(CUSTOM_DBG_FLAGS) -Wall $(WARNING_FLAGS) $(FORMAT_FLAGS) -Wlarger-than=8192 -Wstack-usage=8192 -pie -fPIE -Werror=vla $(ASAN_FLAGS)
 
-CFLAGS_RELEASE := -O3 -std=c++17 -DNDEBUG
+CFLAGS_RELEASE := -O3 -std=c++17 -DNDEBUG -DDISABLE_LOGGING -fstack-protector
 
 BUILD = DEBUG
 

@@ -14,6 +14,8 @@ const char * const DEFAULT_NODE_COLOR   = "#000000";
 const size_t DUMP_BUFFER_SIZE = 128;
 const size_t PARSER_BUFFER_SIZE = 32;
 
+const size_t EXPR_TREE_MAX_LIST_COUNT = 64;
+
 const double DOUBLE_EPSILON = 1e-12; //epsilon for comparing doubles
 
 enum ElemType {
@@ -39,22 +41,24 @@ enum OperatorType {
 typedef struct {
     enum OperatorType opCode;
     bool binary;
+    bool commutative;
     const char *str;
+    const char *texStr;
     unsigned priority;
 } Operator_t;
 
 const Operator_t operators[] = {
-    {ADD, 1, "+"   , 0},
-    {SUB, 1, "-"   , 0},
-    {MUL, 1, "\\cdot "   , 1},
-    {DIV, 1, "/"   , 2},
-    {POW, 1, "^"   , 2},
-    {SIN, 0, "sin" , 3},
-    {COS, 0, "cos" , 3},
-    {TAN, 0, "tg"  , 3},
-    {CTG, 0, "ctg" , 3},
-    {LOG, 1, "log" , 3},
-    {LOGN, 0, "ln" , 3}
+    {.opCode = ADD,  .binary = 1, .commutative = 1, .str = "+"   , .texStr = "+"        , .priority = 0},
+    {.opCode = SUB,  .binary = 1, .commutative = 0, .str = "-"   , .texStr = "-"        , .priority = 0},
+    {.opCode = MUL,  .binary = 1, .commutative = 1, .str = "*"   , .texStr = "\\cdot"   , .priority = 1},
+    {.opCode = DIV,  .binary = 1, .commutative = 0, .str = "/"   , .texStr = "\\frac"   , .priority = 2},
+    {.opCode = POW,  .binary = 1, .commutative = 0, .str = "^"   , .texStr = "^"        , .priority = 2},
+    {.opCode = SIN,  .binary = 0, .commutative = 0, .str = "sin" , .texStr = "\\sin"    , .priority = 3},
+    {.opCode = COS,  .binary = 0, .commutative = 0, .str = "cos" , .texStr = "\\cos"    , .priority = 3},
+    {.opCode = TAN,  .binary = 0, .commutative = 0, .str = "tg"  , .texStr = "\\tan"    , .priority = 3},
+    {.opCode = CTG,  .binary = 0, .commutative = 0, .str = "ctg" , .texStr = "\\ctg"    , .priority = 3},
+    {.opCode = LOG,  .binary = 1, .commutative = 0, .str = "log" , .texStr = "\\log"    , .priority = 3},
+    {.opCode = LOGN, .binary = 0, .commutative = 0, .str = "ln"  , .texStr = "\\ln"     , .priority = 3}
 };
 
 typedef enum TungstenStatus_t {

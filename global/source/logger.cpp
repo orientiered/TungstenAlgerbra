@@ -127,6 +127,7 @@ enum LogLevel getLogLevel() {
 }
 
 enum status logPrintWithTime(enum LogLevel level, bool copyToStderr, const char* fmt, ...) {
+LOGGER_ON_DBG(
     MY_ASSERT(logger.logFile, abort());
     if (level > logger.logLevel)
         return SUCCESS;
@@ -142,10 +143,12 @@ enum status logPrintWithTime(enum LogLevel level, bool copyToStderr, const char*
     vfprintf(logger.logFile, fmt, args);
 
     va_end(args);
+)
     return SUCCESS;
 }
 
 enum status logPrint(enum LogLevel level, bool copyToStderr, const char* fmt, ...) {
+LOGGER_ON_DBG(
     MY_ASSERT(logger.logFile, abort());
     if (level > logger.logLevel)
         return SUCCESS;
@@ -161,11 +164,12 @@ enum status logPrint(enum LogLevel level, bool copyToStderr, const char* fmt, ..
         vfprintf(stderr, fmt, argsStderr);
         va_end(argsStderr);
     }
-
+)
     return SUCCESS;
 }
 
 enum status logPrintColor(enum LogLevel level, const char *color, const char *background, const char *fmt, ...) {
+LOGGER_ON_DBG(
     MY_ASSERT(logger.logFile, abort());
     if (level > logger.logLevel)
         return SUCCESS;
@@ -182,5 +186,6 @@ enum status logPrintColor(enum LogLevel level, const char *color, const char *ba
         fprintf(logger.logFile, "</span>");
 
     va_end(args);
+)
     return SUCCESS;
 }

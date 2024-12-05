@@ -61,6 +61,11 @@ enum status logPrintColor(enum LogLevel level, const char *color, const char *ba
         logPrint(level, __VA_ARGS__);                                                               \
     } while(0)
 
+#if defined(DISABLE_LOGGING)
+    #define LOGGER_ON_DBG(...) ;
+#else
+    #define LOGGER_ON_DBG(...) __VA_ARGS__
+#endif
 
 #endif
 

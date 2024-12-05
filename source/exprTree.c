@@ -13,6 +13,8 @@
 #include "tex.h"
 #include "exprTree.h"
 
+#include "treeDSL.h"
+
 #define CALLOC(size, type) (type *) calloc((size), sizeof(type))
 
 static double calculateOperation(enum OperatorType op, double left, double right) {
@@ -231,6 +233,7 @@ TungstenStatus_t deleteTree(Node_t *node) {
 
 
 /*===========Tree simplification================================*/
+
 Node_t *foldConstants(Node_t *node, bool *changedTree) {
     if (node->type == NUMBER || node->type == VARIABLE) {
         return node;
@@ -238,22 +241,154 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
 
     assert(node->type == OPERATOR);
 
-    bool binary = operators[node->value.op].binary;
-    Node_t *left = NULL, *right = NULL;
-    left = foldConstants(node->left, changedTree);
-    if (binary)
-        right = foldConstants(node->right, changedTree);
+    if (!operators[node->value.op].commutative) {
+        Node_t *left = NULL, *right = NULL;
+        bool binary = operators[node->value.op].binary;
 
-    if (left->type == NUMBER && (!binary ||  right->type == NUMBER) ) {
-        if (changedTree)
-            *changedTree = true;
-        node->value.number = calculateOperation(node->value.op, left->value.number,
-                                                                (right) ? (right->value.number) : 0);
-        deleteTree(node->left); node->left = NULL;
-        if (right) {
-            deleteTree(node->right); node->right = NULL;
+        left = foldConstants(node->left, changedTree);
+        if (binary)
+            right = foldConstants(node->right, changedTree);
+
+        if (left->type == NUMBER && (!binary ||  right->type == NUMBER) ) {
+            if (changedTree)
+                *changedTree = true;
+            node->value.number = calculateOperation(node->value.op, left->value.number,
+                                                                    (right) ? (right->value.number) : 0);
+            deleteTree(node->left); node->left = NULL;
+            if (right) {
+                deleteTree(node->right); node->right = NULL;
+            }
+            node->type = NUMBER;
         }
-        node->type = NUMBER;
+    } else {
+        enum OperatorType op = node->value.op;
+
+        //array with leafs of current commutative operation (e.g. + or *)
+        Node_t *operLeafs[EXPR_TREE_MAX_LIST_COUNT] = {0};
+        size_t listCount = 0;
+
+        //array to find lists using depth-first search
+        Node_t *listsStack[EXPR_TREE_MAX_LIST_COUNT] = {0};
+        size_t stackSize = 0;
+
+        //array with nodes of type operator
+        Node_t *operNodes[EXPR_TREE_MAX_LIST_COUNT] = {0};
+        operNodes[0] = node;
+        size_t operNodesCount = 1;
+
+        // Depth-first search
+        listsStack[0] = node->right;
+        listsStack[1] = node->left;
+        stackSize = 2;
+
+        while (stackSize > 0) {
+            stackSize--;
+            Node_t *current = listsStack[stackSize];
+            logPrint(L_EXTRA, 0, "StackSize = %d, current = %p\n", stackSize, current);
+
+            if (current->type != OPERATOR || current->value.op != op) {
+                logPrint(L_EXTRA, 0, "Calling foldConstants for %p: type = %d\n", current->type);
+                current = foldConstants(current, changedTree);
+            }
+
+            if (current->type == OPERATOR && current->value.op == op) {
+                logPrint(L_EXTRA, 0, "Added = %p\n", current->right);
+                logPrint(L_EXTRA, 0, "Added = %p\n", current->left);
+
+                listsStack[stackSize] = current->right;
+                stackSize++;
+                listsStack[stackSize] = current->left;
+                stackSize++;
+
+                operNodes[operNodesCount++] = current;
+            } else {
+                logPrint(L_EXTRA, 0, "Pushed %p to leafs array\n", current);
+
+                operLeafs[listCount++] = current;
+            }
+
+            logPrint(L_EXTRA, 0, "~StackSize = %d, current = %p\n", stackSize, current);
+
+        }
+
+        // simplifying constants and rearranging tree
+        Node_t *numberNode = NULL;
+
+        size_t writeIdx = 0;
+        for (size_t readIdx = 0; readIdx < listCount; readIdx++) {
+            if (operLeafs[readIdx]->type == NUMBER) {
+                if (!numberNode) {
+                    numberNode = operLeafs[readIdx];
+                } else {
+                    *changedTree = true;
+                    numberNode->value.number = calculateOperation(op,
+                                                                  numberNode->value.number,
+                                                                  operLeafs[readIdx]->value.number);
+                    deleteTree(operLeafs[readIdx]);
+                }
+
+            } else {
+                operLeafs[writeIdx++] = operLeafs[readIdx];
+            }
+        }
+
+        listCount = writeIdx;
+        // if all nodes were numbers
+        if (listCount == 0) {
+            node->type = NUMBER;
+            node->value.number = numberNode->value.number;
+            node->left = NULL;
+            node->right = NULL;
+            deleteTree(numberNode);
+            for (size_t operIdx = 1; operIdx < operNodesCount; operIdx++) {
+                free(operNodes[operIdx]);
+            }
+
+            return node;
+        } else {
+            logPrint(L_EXTRA, 0, "Operator leafs: total = %d\n", listCount);
+            for (int i = 0; i < listCount; i++) {
+                logPrint(L_EXTRA, 0, "i=%d : %p : type = %d\n", i, operLeafs[i], operLeafs[i]->type);
+            }
+
+            // if no numbers then no need to change anything
+            if (!numberNode)
+                return operNodes[0];
+
+            logPrint(L_EXTRA, 0, "Rearranging tree\n");
+
+            operNodes[0]->left = numberNode;
+
+            if (listCount == 1) {
+                operNodes[0]->right = operLeafs[0];
+                return operNodes[0];
+            }
+
+            operNodes[0]->right = operNodes[1];
+            size_t operCounter = 1;
+            Node_t *current = operNodes[1];
+
+
+            for (size_t idx = 0; idx < listCount - 1; idx++) {
+                current->left = operLeafs[idx];
+                operLeafs[idx]->parent = current;
+                if (idx == (listCount - 2) )
+                    current->right = operLeafs[idx + 1];
+                else if (operCounter < operNodesCount)
+                    current->right = operNodes[++operCounter];
+                else
+                    current->right = OPR_(op, NULL, NULL);
+
+                current->right->parent = current;
+                current = current->right;
+            }
+
+            for (size_t operIdx = operCounter + 1; operIdx < operNodesCount; operIdx++) {
+                free(operNodes[operIdx]);
+            }
+            //TODO: free left operators
+            return operNodes[0];
+        }
     }
 
     return node;
@@ -442,7 +577,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
                 if (brackets)
                     result += texPrintf(tex, ")");
 
-                result += texPrintf(tex, "%s", operators[node->value.op].str);
+                result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
 
                 brackets = needBrackets(node->right);
                 if (brackets)
@@ -452,7 +587,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
                     result += texPrintf(tex, ")");
             }
         } else {
-            result += texPrintf(tex, "\\%s ", operators[node->value.op].str);
+            result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
             bool brackets = needBrackets(node->left);
             if (brackets)
                 result += texPrintf(tex, "(");
