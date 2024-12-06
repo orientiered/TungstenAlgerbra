@@ -25,6 +25,10 @@ int main(int argc, const char *argv[]) {
     scanf("%m[^\n]", &exprStr);
 
     Node_t *expr = parseExpression(&context, exprStr);
+    if (!expr) {
+        logPrint(L_ZERO, 0, "Try again\n");
+    }
+
     DUMP_TREE(&context, expr, false);
     expr = simplifyExpression(&tex, &context, expr);
     DUMP_TREE(&context, expr, false);

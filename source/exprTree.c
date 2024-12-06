@@ -216,7 +216,7 @@ static TungstenStatus_t recursiveDumpTree(TungstenContext_t *context, Node_t *no
 }
 
 TungstenStatus_t deleteTree(Node_t *node) {
-    assert(node);
+    if (!node) return TA_SUCCESS;
 
     logPrint(L_EXTRA, 0, "ExprTree:Deleting tree[%p]\n", node);
 
@@ -231,27 +231,7 @@ TungstenStatus_t deleteTree(Node_t *node) {
     return TA_SUCCESS;
 }
 
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node, Node_t *subst);
-
-// int exprFullTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
-//     Node_t *substitutions[EXPR_TREE_MAX_SUBST_COUNT] = {0};
-//
-//     int result = 0;
-//     result += texPrintf(tex, "$");
-//     result += exprTexDumpRecursive(tex, context, node, substitutions);
-//     result += texPrintf(tex, "$");
-//
-//     Node_t *curSubst = substitutions[0];
-//     if (curSubst)
-//         result += texPrint(tex, "Где ");
-//     while (curSubst) {
-//         result += texPrintf(tex, "$%c = $", curSubst->substitutionSymbol);
-//         result += exprFullTexDump(tex, context, node);
-//         result += texPrintf(tex, ", \n\n");
-//         curSubst++;
-//     }
-//     return result;
-// }
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
@@ -259,7 +239,7 @@ int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     int result = 0;
 
     result += texPrintf(tex, "$");
-    result += exprTexDumpRecursive(tex, context, node, NULL);
+    result += exprTexDumpRecursive(tex, context, node);
     result += texPrintf(tex, "$");
 
     return result;
@@ -292,7 +272,7 @@ static size_t getSubtreeSize(Node_t *node) {
     return getSubtreeSize(node->left) + getSubtreeSize(node->right);
 }
 
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node, Node_t *subst) {
+static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
     if (node->type == NUMBER)
         return texPrintf(tex, "%.4lg", node->value.number);
@@ -300,32 +280,30 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
         return texPrintf(tex, "%s", getVariableName(context, node->value.var));
 
     int result = 0;
-    if (node->isSubstitution)
-        return texPrintf(tex, "%c", node->substitutionSymbol);
 
     if (node->type == OPERATOR) {
         if (operators[node->value.op].binary) {
             if (node->value.op == DIV) {
                 result += texPrintf(tex, "\\frac{");
-                result += exprTexDumpRecursive(tex, context, node->left, subst);
+                result += exprTexDumpRecursive(tex, context, node->left);
                 result += texPrintf(tex, "}{");
-                result += exprTexDumpRecursive(tex, context, node->right, subst);
+                result += exprTexDumpRecursive(tex, context, node->right);
                 result += texPrintf(tex, "}");
             } else if (node->value.op == POW) {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left, subst);
+                result += exprTexDumpRecursive(tex, context, node->left);
                 if (brackets)
                     result += texPrintf(tex, ")");
                 result += texPrintf(tex, "^{");
-                result += exprTexDumpRecursive(tex, context, node->right, subst);
+                result += exprTexDumpRecursive(tex, context, node->right);
                 result += texPrintf(tex, "}");
             } else {
                 bool brackets = needBrackets(node->left);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left, subst);
+                result += exprTexDumpRecursive(tex, context, node->left);
                 if (brackets)
                     result += texPrintf(tex, ")");
 
@@ -334,7 +312,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
                 brackets = needBrackets(node->right);
                 if (brackets)
                     result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->right, subst);
+                result += exprTexDumpRecursive(tex, context, node->right);
                 if (brackets)
                     result += texPrintf(tex, ")");
             }
@@ -343,7 +321,7 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
             bool brackets = needBrackets(node->left);
             if (brackets)
                 result += texPrintf(tex, "(");
-            result += exprTexDumpRecursive(tex, context, node->left, subst);
+            result += exprTexDumpRecursive(tex, context, node->left);
             if (brackets)
                 result += texPrintf(tex, ")");
         }

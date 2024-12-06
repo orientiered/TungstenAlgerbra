@@ -33,13 +33,18 @@ static void movePointer(ParseContext_t *context) {
 Node_t *GetGrammar(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     skipSpaces(context);
     Node_t *val = GetExpr(context, tungstenContext);
-    if (!context->success)
-        return val;
+    if (!context->success) {
+        deleteTree(val);
+        return NULL;
+    }
 
     if (*context->pointer == '\0') {
         context->pointer++;
         return val;
-    } else SyntaxError(context, val, "GetGrammar: Expected '\\0', got '%c'", *context->pointer);
+    } else {
+        deleteTree(val);
+        SyntaxError(context, NULL, "GetGrammar: Expected '\\0', got '%c'", *context->pointer);
+    }
 }
 
 Node_t *GetExpr(ParseContext_t *context, TungstenContext_t *tungstenContext) {
@@ -123,7 +128,7 @@ Node_t *GetPrimary(ParseContext_t *context, TungstenContext_t *tungstenContext) 
     if (context->success) return val;
     else context->success = true;
 
-    val = GetNum(context, tungstenContext);
+    val = GetFloat(context, tungstenContext);
     if (!context->success)
         SyntaxError(context, val, "GetPrimary: expected (expr), 'x', or Number, got neither\n");
 
@@ -186,9 +191,37 @@ Node_t *GetVar(ParseContext_t *context, TungstenContext_t *tungstenContext) {
     char buffer[MAX_VARIABLE_LEN] = "";
     strncpy(buffer, context->pointer, (varNameLen <  MAX_VARIABLE_LEN) ? varNameLen : MAX_VARIABLE_LEN - 1);
     size_t varIdx = insertVariable(tungstenContext, buffer);
+
     context->pointer = current;
     skipSpaces(context);
     return createNode(VARIABLE, varIdx, 0, NULL, NULL);
+}
+
+Node_t *GetFloat(ParseContext_t *context, TungstenContext_t *tungstenContext) {
+    Node_t *leading = GetNum(context, tungstenContext);
+    if (!context->success)
+        return leading;
+
+    if (*context->pointer == '.') {
+        context->pointer++;
+
+        Node_t *trailing = GetNum(context, tungstenContext);
+        if (!context->success) {
+            deleteTree(trailing);
+            SyntaxError(context, leading, "GetFloat: expected number after '.', got %c\n", *context->pointer);
+        }
+
+        double trailingPart = trailing->value.number;
+        deleteTree(trailing);
+
+        while (trailingPart > 1)
+            trailingPart /= 10;
+
+        leading->value.number += trailingPart;
+
+    }
+
+    return leading;
 }
 
 Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext) {

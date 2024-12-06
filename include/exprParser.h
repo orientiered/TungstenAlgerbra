@@ -16,10 +16,12 @@ Expr   ::=MulPr{ ['+''-']  MulPr}*
 MulPr  ::=PowPr{ ['*''/']  PowPr}*
 PowPr  ::=Primary{ '^'  PowPr}?
 
-Primary::= '(' Expr ')' | Func | Var | Num
+Primary::= '(' Expr ')' | Func | Var | Float
 
 Func   ::=["sin" "cos" "tg" "ctg" "ln"]'(' Expr ')'
 Var    ::=['a'-'z''_']+ ['a'-'z''_''0'-'9']*
+
+Float  ::=Num{.Num}?
 Num    ::=['0'-'9']+
 */
 
@@ -41,5 +43,7 @@ Node_t *GetPrimary(ParseContext_t *context, TungstenContext_t *tungstenContext);
 
 Node_t *GetFunc(ParseContext_t *context, TungstenContext_t *tungstenContext);
 Node_t *GetVar(ParseContext_t *context, TungstenContext_t *tungstenContext);
+
+Node_t *GetFloat(ParseContext_t *context, TungstenContext_t *tungstenContext);
 Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext);
 #endif

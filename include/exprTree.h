@@ -103,37 +103,54 @@ typedef struct Node_t {
 
     union NodeValue value;
 
-    bool isSubstitution;
-    char substitutionSymbol;
+    // bool isSubstitution;
+    // char substitutionSymbol;
 
     Node_t *left;
     Node_t *right;
 } Node_t;
 
+/// @brief Initialize context of TungstenAlgebra
 TungstenContext_t TungstenCtor();
+
+/// @brief Delete context of TungstenAlgebra
 TungstenStatus_t TungstenDtor(TungstenContext_t *context);
 
+/// @brief Create node of given type
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right);
+
+/// @brief Delete tree recursively
 TungstenStatus_t deleteTree(Node_t *node);
 
+/// @brief Create copy of tree recursively
 Node_t *copyTree(Node_t *node);
 
 
 TungstenStatus_t verifyTree(Node_t *node);
+
+/// @brief Dump tree using graphviz
+/// @param context TungstenAlgebra context
+/// @param node Root node of the tree
+/// @param minified Do not show pointers if true
 TungstenStatus_t dumpTree(TungstenContext_t *context, Node_t *node, bool minified);
 
+/// @brief Print equation in LaTeX form
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
+//!DEPRECATED
+/// @brief Parse expression written if prefix form
 Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression);
 
 //Parse expression written if natural mathematical way
 Node_t *parseExpression(TungstenContext_t *context, const char *expression);
 
-double calculateOperation(enum OperatorType op, double left, double right);
-
+/// @brief Evaluate given expression
 double evaluate(TungstenContext_t *context, Node_t *node);
 
-/// @brief Fold constants in tree.
+double calculateOperation(enum OperatorType op, double left, double right);
+
+
+/// @brief Fold constants in tree
 Node_t *foldConstants(Node_t *node, bool *changedTree);
 
 /// @brief Remove neutral operations such as *1, +0, ^1, etc.

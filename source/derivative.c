@@ -80,10 +80,12 @@ static Node_t *derivativeOperator(TexContext_t *tex, TungstenContext_t *context,
                                         OPR_(LOGN, cL_, NULL) );
                 } else {
                     //d(g^f) = d( e^(f*ln(g)) ) = g^f * d( f*ln(g) ) = g^f * (df*ln(g) + f*dg/g)
-                    Node_t *tempTree = OPR_(MUL, cR_, OPR_(LOGN, cL_, NULL) );
-
-                    result = OPR_(MUL, copyTree(expr), derivativeBase(tex, context, tempTree, variable) );
-                    deleteTree(tempTree);
+                    Node_t *tempTree = OPR_(ADD, OPR_(MUL, dR_,
+                                                           OPR_(LOGN, cL_, NULL) ),
+                                                 OPR_(DIV, OPR_(MUL, cR_, dL_),
+                                                           cL_)
+                                            );
+                    result = OPR_(MUL, copyTree(expr), tempTree);
                 }
             }
             break;
