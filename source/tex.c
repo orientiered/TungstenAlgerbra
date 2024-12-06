@@ -38,8 +38,8 @@ TexContext_t texInit(const char *name) {
     );
 
     texPrintf(&tex,
-    "\\title{Пособие по дифференциальному исчислению}\n"
-    "\\author{Лев Толстой}\n"
+    "\\title{Отчёт по дифференцированию}\n"
+    "\\author{Tungsten Algebra}\n"
     "\\begin{document}\n"
     "\\maketitle\n"
     );
@@ -155,7 +155,7 @@ enum TexStatus texClose(TexContext_t *tex) {
     texPrintf(tex, "\\end{document}\n");
     fclose(tex->file);
     char command[TEX_COMMAND_BUFFER_SIZE] = "";
-    sprintf(command, "pdflatex %s", tex->fileName);
+    sprintf(command, "pdflatex -quiet %s", tex->fileName);
     system(command);
     return TEX_SUCCESS;
 }

@@ -34,17 +34,17 @@ enum OperatorType {
     COS,        ///< cos
     TAN,        ///< tan
     CTG,        ///< ctg
-    LOG,        ///< log_x(y)
+    LOG,        ///< log_x(y) //!WARNING: not supported in parser
     LOGN,       ///< ln
 };
 
 typedef struct {
     enum OperatorType opCode;
-    bool binary;
-    bool commutative;
-    const char *str;
-    const char *texStr;
-    unsigned priority;
+    bool binary;            ///< Has two arguments
+    bool commutative;       ///< a # b = b # a
+    const char *str;        ///< string to write in dump
+    const char *texStr;     ///< string to write in tex
+    unsigned priority;      ///< Priority of operation (bigger = executes first) (affects only tex)
 } Operator_t;
 
 const Operator_t operators[] = {
@@ -103,19 +103,18 @@ typedef struct Node_t {
 
     union NodeValue value;
 
-    // bool isSubstitution;
-    // char substitutionSymbol;
-
     Node_t *left;
     Node_t *right;
 } Node_t;
 
+/*==========================TunsgtenAlgebra context==========================*/
 /// @brief Initialize context of TungstenAlgebra
 TungstenContext_t TungstenCtor();
 
 /// @brief Delete context of TungstenAlgebra
 TungstenStatus_t TungstenDtor(TungstenContext_t *context);
 
+/*============================Node manipulations===================================*/
 /// @brief Create node of given type
 Node_t *createNode(enum ElemType type, int iVal, double dVal, Node_t *left, Node_t *right);
 
@@ -126,6 +125,25 @@ TungstenStatus_t deleteTree(Node_t *node);
 Node_t *copyTree(Node_t *node);
 
 
+/*=========================Creating expressions from strings===================*/
+
+//Parse expression written if natural mathematical way
+Node_t *parseExpression(TungstenContext_t *context, const char *expression);
+//!DEPRECATED
+/// @brief Parse expression written if prefix form
+Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression);
+
+
+/*==========================Evaluation of expressions=========================== */
+
+/// @brief Evaluate given expression
+double evaluate(TungstenContext_t *context, const Node_t *node);
+
+double calculateOperation(enum OperatorType op, double left, double right);
+
+
+/*================================Dump tools==============================*/
+
 TungstenStatus_t verifyTree(Node_t *node);
 
 /// @brief Dump tree using graphviz
@@ -134,26 +152,20 @@ TungstenStatus_t verifyTree(Node_t *node);
 /// @param minified Do not show pointers if true
 TungstenStatus_t dumpTree(TungstenContext_t *context, Node_t *node, bool minified);
 
-/// @brief Print equation in LaTeX form
+/// @brief Print equation in LaTeX form with $
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
+/// @brief Print equation in LaTeX form without $
+int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
+
+/// @brief Plot graph using pgfplots
+/// yMax is maximum module value of y
 TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
                                const Node_t *expr, const char *variable,
                                double xMin, double xMax, double yMax, unsigned pointsCount);
 
-//!DEPRECATED
-/// @brief Parse expression written if prefix form
-Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression);
 
-//Parse expression written if natural mathematical way
-Node_t *parseExpression(TungstenContext_t *context, const char *expression);
-
-/// @brief Evaluate given expression
-double evaluate(TungstenContext_t *context, const Node_t *node);
-
-double calculateOperation(enum OperatorType op, double left, double right);
-
-
+/*=================================Tree simplifications==============================*/
 /// @brief Fold constants in tree
 Node_t *foldConstants(Node_t *node, bool *changedTree);
 
@@ -162,7 +174,6 @@ Node_t *removeNeutralOperations(Node_t *node, bool *changedTree);
 
 /// @brief Combine foldConstants() and removeNeutralOperations() while tree can be simplified
 Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
-
 
 
 /*=====================NameTable functions==========================*/
@@ -177,6 +188,8 @@ double getVariable(TungstenContext_t *tungsten, int varIdx);
 const char *getVariableName(TungstenContext_t *tungsten, int varIdx);
 
 double getVariableByName(TungstenContext_t *tungsten, const char *variableName);
+
+
 /*===================================================================*/
 
 #if defined(_TREE_DUMP) && !defined(NDEBUG)

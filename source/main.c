@@ -21,7 +21,7 @@ int main(int argc, const char *argv[]) {
     setLogLevel(L_EXTRA);
 
     registerFlag(TYPE_INT, "-t", "--taylor", "Compute taylor expansion");
-    registerFlag(TYPE_FLOAT, "-p", "--point", "Compute taylor expansion");
+    registerFlag(TYPE_FLOAT, "-p", "--point", "Point where taylor expansion is computed");
     processArgs(argc, argv);
     // logDisableBuffering();
     TexContext_t tex = texInit("textest.tex");
@@ -39,7 +39,7 @@ int main(int argc, const char *argv[]) {
     expr = simplifyExpression(&tex, &context, expr);
     DUMP_TREE(&context, expr, false);
 
-    texPrintf(&tex, "Дано:\n\n");
+    texPrintf(&tex, "Дано:");
     exprTexDump(&tex, &context, expr);
     texPrintf(&tex, "\n\n");
 
@@ -50,8 +50,12 @@ int main(int argc, const char *argv[]) {
     texPrintf(&tex, "\n\n");
     diff = simplifyExpression(&tex, &context, diff);
     DUMP_TREE(&context, diff, 0);
-    exprTexDump(&tex, &context, diff);
-    texPrintf(&tex, "\n\n");
+
+    texPrintf(&tex, "$$(");
+    exprTexDumpRecursive(&tex, &context, expr);
+    texPrintf(&tex, ")' = ");
+    exprTexDumpRecursive(&tex, &context, diff);
+    texPrintf(&tex, "$$\n\n");
 
     if (isFlagSet("-t")) {
         double expansionPoint = (isFlagSet("-p")) ? getFlagValue("-p").float_ : 0;

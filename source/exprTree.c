@@ -231,8 +231,6 @@ TungstenStatus_t deleteTree(Node_t *node) {
     return TA_SUCCESS;
 }
 
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
-
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
 
@@ -272,7 +270,7 @@ static size_t getSubtreeSize(Node_t *node) {
     return getSubtreeSize(node->left) + getSubtreeSize(node->right);
 }
 
-static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
+int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
     if (node->type == NUMBER)
         return texPrintf(tex, "%.4lg", node->value.number);

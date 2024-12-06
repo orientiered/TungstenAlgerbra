@@ -125,7 +125,13 @@ static Node_t *derivativeOperator(TexContext_t *tex, TungstenContext_t *context,
 /// @param variable derivative variable
 /// @return Derivative tree
 Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *expr, int variable) {
-    texPrintf(tex, "Нужно найти производную выражения: ");
+    const char *statements[] = {
+        "Нужно найти производную выражения: ",
+        "Хотим derivative от: ",
+        "Для дальнейших вычислений продиффиренцируем: "
+    };
+    const size_t statementsCnt = sizeof(statements) / sizeof(statements[0]);
+    texPrintf(tex, statements[rand() % statementsCnt]);
     exprTexDump(tex, context, expr);
     texPrintf(tex, "\n\n");
 
@@ -151,9 +157,9 @@ Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *ex
 
     texPrintf(tex, "(");
     exprTexDump(tex, context, expr);
-    texPrintf(tex, ")' = $");
+    texPrintf(tex, ")' = ");
     exprTexDump(tex, context, result);
-    texPrintf(tex, "$\n\n");
+    texPrintf(tex, "\n\n");
 
     return result;
 }
