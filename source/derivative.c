@@ -151,9 +151,9 @@ Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *ex
 
     texPrintf(tex, "(");
     exprTexDump(tex, context, expr);
-    texPrintf(tex, ")' = ");
+    texPrintf(tex, ")' = $");
     exprTexDump(tex, context, result);
-    texPrintf(tex, "\n\n");
+    texPrintf(tex, "$\n\n");
 
     return result;
 }

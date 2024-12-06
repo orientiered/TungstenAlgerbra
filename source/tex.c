@@ -59,33 +59,43 @@ int texPrintf(TexContext_t *tex, const char *fmt, ...) {
     return result;
 }
 
-int texBeginGraph(TexContext_t *tex) {
+int texBeginGraph(TexContext_t *tex, const char *xLabel, const char *yLabel, const char *graphTitle) {
     if (!tex->active) return 0;
 
     if (!tex->file) return -1;
-    return fprintf(tex->file,
-    "\n\\begin{tikzpicture}\n"
-    "\\pgfplotsset{grid = both}\n"
-    "\\begin{axis}\n"
-    "\\addplot coordinates {\n"
+    return texPrintf(tex,
+                    "\n\\begin{tikzpicture}\n"
+                    "\\pgfplotsset{grid = both}\n"
+                    "\\begin{axis}[\n"
+                    "\ttitle = %s,\n"
+                    "\txlabel = {%s},\n"
+                    "\tylabel = {%s}\n"
+                    "]\n",
+                    graphTitle, xLabel, yLabel
     );
+}
+
+int texAddGraph(TexContext_t *tex, double *x, double *y, int pointsCount) {
+    if (!tex->active) return 0;
+    if (!tex->file) return -1;
+
+    int result = 0;
+    result += texPrintf(tex, "\\addplot coordinates {\n");
+
+    for (unsigned idx = 0; idx < pointsCount; idx++) {
+        texPrintf(tex, "(%.5lg, %.5lg) ", x[idx], y[idx]);
+    }
+
+    result += texPrintf(tex,    "};\n");
+
+    return result;
 }
 
 int texEndGraph(TexContext_t *tex) {
     if (!tex->active) return 0;
 
-    if (!tex->file) return -1;
-    return fprintf(tex->file,
-    "};\n"
-    "\\end{axis}\n"
-    "\\end{tikzpicture}\n"
-    );
-}
-
-int texAddCoordinates(TexContext_t *tex, double x, double y) {
-    if (!tex->active) return 0;
-
-    return texPrintf(tex, "(%.5lg, %.5lg) ", x, y);
+    return texPrintf(tex, "\\end{axis}\n"
+                          "\\end{tikzpicture}\n");
 }
 
 int texBeginTable(TexContext_t *tex, unsigned columns) {

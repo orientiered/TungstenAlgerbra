@@ -225,10 +225,6 @@ Node_t *GetFloat(ParseContext_t *context, TungstenContext_t *tungstenContext) {
 }
 
 Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext) {
-    if (*context->pointer < '0' || *context->pointer > '9') {
-        context->success = false;
-        return NULL;
-    }
 
     char *endPtr = NULL;
     double num = strtod(context->pointer, &endPtr);

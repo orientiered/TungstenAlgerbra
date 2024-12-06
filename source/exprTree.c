@@ -100,7 +100,7 @@ Node_t *copyTree(Node_t *node) {
     return createNode(node->type, node->value.var, node->value.number, left, right);
 }
 
-double evaluate(TungstenContext_t *context, Node_t *node) {
+double evaluate(TungstenContext_t *context, const Node_t *node) {
     assert(node);
 
     logPrint(L_EXTRA, 0, "ExprTree:Evaluating node[%p]\n", node);
@@ -330,6 +330,36 @@ static int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, N
     return result;
 }
 
+TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
+                               const Node_t *expr, const char *variable,
+                               double xMin, double xMax, double yMax, unsigned pointsCount) {
+
+    double *pointsMemory = CALLOC(pointsCount * 2, double);
+    double *xCoords = pointsMemory;
+    double *yCoords = pointsMemory + pointsCount;
+    unsigned calculatedPoints = 0;
+
+    double step = (xMax - xMin) / pointsCount;
+
+    for (unsigned idx = 0; idx < pointsCount; idx++) {
+        double currentX = xMin + step * idx;
+        setVariable(context, variable, currentX);
+        double yCoord = evaluate(context, expr);
+
+        if (fabs(yCoord) < yMax) {
+            xCoords[calculatedPoints] = currentX;
+            yCoords[calculatedPoints] = yCoord;
+            calculatedPoints++;
+        }
+    }
+
+    texAddGraph(tex, xCoords, yCoords, calculatedPoints);
+
+    free(pointsMemory);
+    return TA_SUCCESS;
+}
+
+
 /*================PREFIX EQUATION PARSING==============================*/
 //!DEPRECATED
 static Node_t *recursiveParseExpressionPrefix(TungstenContext_t *context, const char **expression);
@@ -367,7 +397,7 @@ static enum ElemType scanElement(TungstenContext_t *context, char *buffer, union
     size_t elemLen = strlen(buffer);
 
     size_t scanned = 0;
-    if (sscanf(buffer, "%lg%n", &value->number, &scanned) == 1 && scanned == elemLen) {
+    if (sscanf(buffer, "%lg%ln", &value->number, &scanned) == 1 && scanned == elemLen) {
         return NUMBER;
     }
 

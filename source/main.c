@@ -11,11 +11,17 @@
 #include "derivative.h"
 #include "treeDSL.h"
 
+
+const size_t GRAPH_POINTS_COUNT = 100;
+const double GRAPH_X_DELTA = 10;
+const double GRAPH_Y_MAX = 10; //module of y
+
 int main(int argc, const char *argv[]) {
     logOpen("log.html", L_HTML_MODE);
     setLogLevel(L_EXTRA);
 
     registerFlag(TYPE_INT, "-t", "--taylor", "Compute taylor expansion");
+    registerFlag(TYPE_FLOAT, "-p", "--point", "Compute taylor expansion");
     processArgs(argc, argv);
     // logDisableBuffering();
     TexContext_t tex = texInit("textest.tex");
@@ -48,16 +54,21 @@ int main(int argc, const char *argv[]) {
     texPrintf(&tex, "\n\n");
 
     if (isFlagSet("-t")) {
-        Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", 0, getFlagValue("-t").int_);
+        double expansionPoint = (isFlagSet("-p")) ? getFlagValue("-p").float_ : 0;
+        Node_t *taylor = TaylorExpansion(&tex, &context, expr, "x", expansionPoint, getFlagValue("-t").int_);
         // exprTexDump(&tex, &context, taylor);
 
-        texBeginGraph(&tex);
-        for (double xCoord = -10; xCoord < 10; xCoord += 0.05) {
-            setVariable(&context, "x", xCoord);
-            double yCoord = evaluate(&context, expr);
-            if (fabs(yCoord) < 10)
-                texAddCoordinates(&tex, xCoord, evaluate(&context, expr));
-        }
+        texBeginGraph(&tex, "x", "y", "График функций");
+        texPrintf(&tex,
+                "\\legend{\n"
+                "$f(x)$,\n"
+                "Taylor\n"
+                "};\n"
+        );
+
+        plotExprGraph(&tex, &context, expr,   "x", expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
+        plotExprGraph(&tex, &context, taylor, "x", expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
+
         texEndGraph(&tex);
         deleteTree(taylor);
     }

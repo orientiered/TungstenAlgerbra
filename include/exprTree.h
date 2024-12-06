@@ -137,6 +137,10 @@ TungstenStatus_t dumpTree(TungstenContext_t *context, Node_t *node, bool minifie
 /// @brief Print equation in LaTeX form
 int exprTexDump(TexContext_t *tex, TungstenContext_t *context, Node_t *node);
 
+TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
+                               const Node_t *expr, const char *variable,
+                               double xMin, double xMax, double yMax, unsigned pointsCount);
+
 //!DEPRECATED
 /// @brief Parse expression written if prefix form
 Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression);
@@ -145,7 +149,7 @@ Node_t *parseExpressionPrefix(TungstenContext_t *context, const char *expression
 Node_t *parseExpression(TungstenContext_t *context, const char *expression);
 
 /// @brief Evaluate given expression
-double evaluate(TungstenContext_t *context, Node_t *node);
+double evaluate(TungstenContext_t *context, const Node_t *node);
 
 double calculateOperation(enum OperatorType op, double left, double right);
 
