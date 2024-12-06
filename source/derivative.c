@@ -222,7 +222,7 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
                         OPR_(MUL,
                                 NUM_(coefficient),
                                 OPR_(POW,
-                                        VAR_(varIdx),
+                                        OPR_(SUB, VAR_(varIdx), NUM_(point)),
                                         NUM_(membPower)
                                     )
                             )
