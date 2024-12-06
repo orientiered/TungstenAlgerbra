@@ -128,7 +128,7 @@ Node_t *GetPrimary(ParseContext_t *context, TungstenContext_t *tungstenContext) 
     if (context->success) return val;
     else context->success = true;
 
-    val = GetFloat(context, tungstenContext);
+    val = GetNum(context, tungstenContext);
     if (!context->success)
         SyntaxError(context, val, "GetPrimary: expected (expr), 'x', or Number, got neither\n");
 
@@ -225,16 +225,18 @@ Node_t *GetFloat(ParseContext_t *context, TungstenContext_t *tungstenContext) {
 }
 
 Node_t *GetNum(ParseContext_t *context, TungstenContext_t *tungstenContext) {
-    int num = 0;
-
     if (*context->pointer < '0' || *context->pointer > '9') {
         context->success = false;
         return NULL;
     }
-    while (*context->pointer >= '0' && *context->pointer <= '9') {
-        num = num * 10 + *context->pointer - '0';
-        context->pointer++;
+
+    char *endPtr = NULL;
+    double num = strtod(context->pointer, &endPtr);
+    if (endPtr == context->pointer) {
+        context->success = false;
+        return NULL;
     }
+    context->pointer = (const char *) endPtr;
 
     skipSpaces(context);
     Node_t *val = createNode(NUMBER, 0, num, NULL, NULL);
