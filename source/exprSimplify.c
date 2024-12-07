@@ -11,7 +11,7 @@
 #include "treeDSL.h"
 /*===========Tree simplification================================*/
 
-Node_t *foldConstants(Node_t *node, bool *changedTree) {
+Node_t *foldConstants(TexContext_t *tex, TungstenContext_t *context, Node_t *node, bool *changedTree) {
     if (node->type == NUMBER || node->type == VARIABLE) {
         return node;
     }
@@ -22,13 +22,18 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
         Node_t *left = NULL, *right = NULL;
         bool binary = operators[node->value.op].binary;
 
-        left = foldConstants(node->left, changedTree);
+        left = foldConstants(tex, context, node->left, changedTree);
         if (binary)
-            right = foldConstants(node->right, changedTree);
+            right = foldConstants(tex, context, node->right, changedTree);
 
         if (left->type == NUMBER && (!binary ||  right->type == NUMBER) ) {
             if (changedTree)
                 *changedTree = true;
+
+            texPrintf(tex, "Заметим, что $");
+            exprTexDumpRecursive(tex, context, node);
+            texPrintf(tex, " = ");
+
             node->value.number = calculateOperation(node->value.op, left->value.number,
                                                                     (right) ? (right->value.number) : 0);
             deleteTree(node->left); node->left = NULL;
@@ -36,10 +41,14 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
                 deleteTree(node->right); node->right = NULL;
             }
             node->type = NUMBER;
+            exprTexDumpRecursive(tex, context, node);
+            texPrintf(tex, "$\n\n");
+
         }
     } else {
         enum OperatorType op = node->value.op;
 
+        bool localChanges = false;
         //array with leafs of current commutative operation (e.g. + or *)
         Node_t *operLeafs[EXPR_TREE_MAX_LIST_COUNT] = {0};
         size_t leafsCount = 0;
@@ -65,7 +74,7 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
 
             if (current->type != OPERATOR || current->value.op != op) {
                 logPrint(L_EXTRA, 0, "Calling foldConstants for %p: type = %d\n", current->type);
-                current = foldConstants(current, changedTree);
+                current = foldConstants(tex, context, current, changedTree);
             }
 
             if (current->type == OPERATOR && current->value.op == op) {
@@ -98,6 +107,13 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
                 if (!numberNode) {
                     numberNode = operLeafs[readIdx];
                 } else {
+                    if (!localChanges) {
+                        texPrintf(tex, "Каждый школьник знает, что \n$$");
+                        exprTexDumpRecursive(tex, context, node);
+                        texPrintf(tex, " = ");
+                    }
+                    localChanges = true;
+
                     *changedTree = true;
                     numberNode->value.number = calculateOperation(op,
                                                                   numberNode->value.number,
@@ -153,6 +169,11 @@ Node_t *foldConstants(Node_t *node, bool *changedTree) {
         for (size_t operIdx = operCounter + 1; operIdx < operNodesCount; operIdx++) {
             free(operNodes[operIdx]);
         }
+
+        if (localChanges) {
+            exprTexDumpRecursive(tex, context, node);
+            texPrintf(tex, "$$\n\n");
+        }
     }
 
     return node;
@@ -162,18 +183,17 @@ static bool isEqualDouble(double a, double b) {
     return fabs(b-a) < DOUBLE_EPSILON;
 }
 
-// static linkNode(Node_t *destination, Node_t *source)
-Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
+Node_t *removeNeutralOperations(TexContext_t *tex, TungstenContext_t *context, Node_t *node, bool *changedTree) {
     assert(node);
 
     if (node->type == NUMBER || node->type == VARIABLE)
         return node;
 
     if (node->left)
-        node->left = removeNeutralOperations(node->left, changedTree);
+        node->left = removeNeutralOperations(tex, context, node->left, changedTree);
 
     if (node->right)
-        node->right = removeNeutralOperations(node->right, changedTree);
+        node->right = removeNeutralOperations(tex, context, node->right, changedTree);
 
     Node_t *result = node;
     bool leftIsNumber  = (node->left->type == NUMBER);
@@ -244,6 +264,17 @@ Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
         if (changedTree)
             *changedTree = true;
         //unlinking result subtree from node to use deleteTree() function
+
+
+        texPrintf(tex, "Как сказано в трудах Знаменской Л. Н., $");
+
+
+        exprTexDumpRecursive(tex, context, node);
+
+        texPrintf(tex, " = ");
+        exprTexDumpRecursive(tex, context, result);
+        texPrintf(tex, "$\n\n");
+
         if (result == node->left)
             node->left = NULL;
         else
@@ -256,20 +287,25 @@ Node_t *removeNeutralOperations(Node_t *node, bool *changedTree) {
 
 Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     bool changedTree = false;
+    bool anyChangesMade = false;
+    Node_t *copy = copyTree(node);
+
     do {
-        Node_t *copy = copyTree(node);
         changedTree = false;
-        node = foldConstants(node, &changedTree);
-        node = removeNeutralOperations(node, &changedTree);
-        if (changedTree) {
-            texPrintf(tex, "Упростим выражение:\n\n");
-            exprTexDump(tex, context, copy);
-            texPrintf(tex, " = ");
-            exprTexDump(tex, context, node);
-            texPrintf(tex, "\n\n");
-        }
-        deleteTree(copy);
+        node = foldConstants(tex, context, node, &changedTree);
+        node = removeNeutralOperations(tex, context, node, &changedTree);
+        anyChangesMade = anyChangesMade || changedTree;
     } while (changedTree);
+
+    if (anyChangesMade) {
+        texPrintf(tex, "В результате получаем:\n\n$");
+        exprTexDumpRecursive(tex, context, copy);
+        texPrintf(tex, " = ");
+        exprTexDumpRecursive(tex, context, node);
+        texPrintf(tex, "$\n\n");
+    }
+
+    deleteTree(copy);
 
     return node;
 }

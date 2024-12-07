@@ -33,6 +33,10 @@ double calculateOperation(enum OperatorType op, double left, double right) {
             return sin(left);
         case COS:
             return cos(left);
+        case SINH:
+            return sinh(left);
+        case COSH:
+            return cosh(left);
         case TAN:
             return tan(left);
         case CTG:
@@ -257,7 +261,10 @@ static bool needBrackets(Node_t *node) {
     if (node->type == OPERATOR) {
         if (!operators[node->value.op].binary) return false;
 
-        return (operators[node->parent->value.op].opCode == POW || operators[node->parent->value.op].priority > operators[node->value.op].priority);
+        unsigned currentPriority = operators[node->value.op].priority;
+        unsigned parentPriority = operators[node->parent->value.op].priority;
+
+        return (operators[node->parent->value.op].opCode == POW || parentPriority > currentPriority);
     }
     return false;
 }
@@ -270,6 +277,21 @@ static size_t getSubtreeSize(Node_t *node) {
     return getSubtreeSize(node->left) + getSubtreeSize(node->right);
 }
 
+static int exprTexDumpWithBrackets(TexContext_t *tex, TungstenContext_t *context, Node_t *node, bool checkBrackets) {
+    assert(node);
+
+    int result = 0;
+    bool brackets = checkBrackets && needBrackets(node);
+
+    if (brackets)
+        result += texPrintf(tex, "(");
+    result += exprTexDumpRecursive(tex, context, node);
+    if (brackets)
+        result += texPrintf(tex, ")");
+
+    return result;
+}
+
 int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *node) {
     assert(node);
     if (node->type == NUMBER)
@@ -279,50 +301,35 @@ int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *
 
     int result = 0;
 
-    if (node->type == OPERATOR) {
-        if (operators[node->value.op].binary) {
-            if (node->value.op == DIV) {
-                result += texPrintf(tex, "\\frac{");
-                result += exprTexDumpRecursive(tex, context, node->left);
-                result += texPrintf(tex, "}{");
-                result += exprTexDumpRecursive(tex, context, node->right);
-                result += texPrintf(tex, "}");
-            } else if (node->value.op == POW) {
-                bool brackets = needBrackets(node->left);
-                if (brackets)
-                    result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left);
-                if (brackets)
-                    result += texPrintf(tex, ")");
-                result += texPrintf(tex, "^{");
-                result += exprTexDumpRecursive(tex, context, node->right);
-                result += texPrintf(tex, "}");
-            } else {
-                bool brackets = needBrackets(node->left);
-                if (brackets)
-                    result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->left);
-                if (brackets)
-                    result += texPrintf(tex, ")");
+    assert(node->type == OPERATOR);
 
-                result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
+    if (operators[node->value.op].binary) {
+        if (node->value.op == DIV) {
 
-                brackets = needBrackets(node->right);
-                if (brackets)
-                    result += texPrintf(tex, "(");
-                result += exprTexDumpRecursive(tex, context, node->right);
-                if (brackets)
-                    result += texPrintf(tex, ")");
-            }
-        } else {
-            result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
-            bool brackets = needBrackets(node->left);
-            if (brackets)
-                result += texPrintf(tex, "(");
+            result += texPrintf(tex, "\\frac{");
             result += exprTexDumpRecursive(tex, context, node->left);
-            if (brackets)
-                result += texPrintf(tex, ")");
+            result += texPrintf(tex, "}{");
+            result += exprTexDumpRecursive(tex, context, node->right);
+            result += texPrintf(tex, "}");
+
+        } else if (node->value.op == POW) {
+
+            result += exprTexDumpWithBrackets(tex, context, node->left, true);
+            result += texPrintf(tex, "^{");
+            result += exprTexDumpRecursive(tex, context, node->right);
+            result += texPrintf(tex, "}");
+
+        } else {
+
+            result += exprTexDumpWithBrackets(tex, context, node->left, true);
+            result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
+            result += exprTexDumpWithBrackets(tex, context, node->right, true);
+
         }
+    } else {
+
+        result += texPrintf(tex, "%s ", operators[node->value.op].texStr);
+        result += exprTexDumpWithBrackets(tex, context, node->left, true);
     }
 
     return result;
@@ -420,7 +427,7 @@ static Node_t *recursiveParseExpressionPrefix(TungstenContext_t *context, const 
 
     union NodeValue value = {0};
 
-    char buffer[PARSER_BUFFER_SIZE] = "";
+    char buffer[PREFIX_PARSER_BUFFER_SIZE] = "";
     sscanf(*expression, " %[^() ] %n", buffer, &shift);
     (*expression) += shift;
     shift = 0;

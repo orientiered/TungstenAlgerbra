@@ -26,6 +26,8 @@ TexContext_t texInit(const char *name) {
     texPrintf(&tex,
     "\\documentclass[11pt]{article}\n"
     "\\usepackage[utf8x]{inputenc}\n"
+    "\\usepackage[T1]{fontenc}\n"
+    "\\usepackage{textcomp}\n"
     "\\usepackage[russian]{babel}\n"
     "\\usepackage{multicol}\n"
     "\\usepackage{graphicx}\n"

@@ -12,7 +12,7 @@ const char * const VARIABLE_COLOR       = "#f3d4de";
 const char * const NUMBER_COLOR         = "#107980";
 const char * const DEFAULT_NODE_COLOR   = "#000000";
 const size_t DUMP_BUFFER_SIZE = 128;
-const size_t PARSER_BUFFER_SIZE = 32;
+const size_t PREFIX_PARSER_BUFFER_SIZE = 32;
 
 const size_t EXPR_TREE_MAX_LIST_COUNT = 64;
 const size_t EXPR_TREE_MAX_SUBST_COUNT = 64;
@@ -32,6 +32,8 @@ enum OperatorType {
     POW,        ///< ^
     SIN,        ///< sin
     COS,        ///< cos
+    SINH,       ///< sh
+    COSH,       ///< ch
     TAN,        ///< tan
     CTG,        ///< ctg
     LOG,        ///< log_x(y) //!WARNING: not supported in parser
@@ -55,6 +57,8 @@ const Operator_t operators[] = {
     {.opCode = POW,  .binary = 1, .commutative = 0, .str = "^"   , .texStr = "^"        , .priority = 2},
     {.opCode = SIN,  .binary = 0, .commutative = 0, .str = "sin" , .texStr = "\\sin"    , .priority = 3},
     {.opCode = COS,  .binary = 0, .commutative = 0, .str = "cos" , .texStr = "\\cos"    , .priority = 3},
+    {.opCode = SINH, .binary = 0, .commutative = 0, .str = "sh" ,  .texStr = "\\sinh"   , .priority = 3},
+    {.opCode = COSH, .binary = 0, .commutative = 0, .str = "ch" ,  .texStr = "\\cosh"   , .priority = 3},
     {.opCode = TAN,  .binary = 0, .commutative = 0, .str = "tg"  , .texStr = "\\tan"    , .priority = 3},
     {.opCode = CTG,  .binary = 0, .commutative = 0, .str = "ctg" , .texStr = "\\ctg"    , .priority = 3},
     {.opCode = LOG,  .binary = 1, .commutative = 0, .str = "log" , .texStr = "\\log"    , .priority = 3},
@@ -167,10 +171,10 @@ TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
 
 /*=================================Tree simplifications==============================*/
 /// @brief Fold constants in tree
-Node_t *foldConstants(Node_t *node, bool *changedTree);
+Node_t *foldConstants(TexContext_t *tex, TungstenContext_t *context, Node_t *node, bool *changedTree);
 
 /// @brief Remove neutral operations such as *1, +0, ^1, etc.
-Node_t *removeNeutralOperations(Node_t *node, bool *changedTree);
+Node_t *removeNeutralOperations(TexContext_t *tex, TungstenContext_t *context, Node_t *node, bool *changedTree);
 
 /// @brief Combine foldConstants() and removeNeutralOperations() while tree can be simplified
 Node_t *simplifyExpression(TexContext_t *tex, TungstenContext_t *context, Node_t *node);

@@ -97,6 +97,12 @@ static Node_t *derivativeOperator(TexContext_t *tex, TungstenContext_t *context,
             result = OPR_(MUL, OPR_(SIN, cL_, NULL),
                                 OPR_(MUL, NUM_(-1), dL_));
             break;
+        case SINH:
+            result = OPR_(MUL, OPR_(COSH, cL_, NULL), dL_);
+            break;
+        case COSH:
+            result = OPR_(MUL, OPR_(SINH, cL_, NULL), dL_);
+            break;
         case TAN:
             result = OPR_(MUL, dL_,
                                OPR_(POW, OPR_(COS, cL_, NULL), NUM_(-2) ) );
@@ -127,7 +133,7 @@ static Node_t *derivativeOperator(TexContext_t *tex, TungstenContext_t *context,
 Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *expr, int variable) {
     const char *statements[] = {
         "Нужно найти производную выражения: ",
-        "Хотим derivative от: ",
+        "Вычислим производную от: ",
         "Для дальнейших вычислений продиффиренцируем: "
     };
     const size_t statementsCnt = sizeof(statements) / sizeof(statements[0]);
@@ -155,11 +161,11 @@ Node_t *derivativeBase(TexContext_t *tex, TungstenContext_t *context, Node_t *ex
             break;
     }
 
-    texPrintf(tex, "(");
-    exprTexDump(tex, context, expr);
+    texPrintf(tex, "$$(");
+    exprTexDumpRecursive(tex, context, expr);
     texPrintf(tex, ")' = ");
-    exprTexDump(tex, context, result);
-    texPrintf(tex, "\n\n");
+    exprTexDumpRecursive(tex, context, result);
+    texPrintf(tex, "$$\n\n");
 
     return result;
 }
@@ -196,7 +202,7 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
     Node_t *taylor = NUM_(curVal);
 
     //TODO: 64 -> constant
-    char firstCol[64] = "", secondCol[64] = "";
+    // char firstCol[64] = "", secondCol[64] = "";
 
     // texBeginTable(tex, 2);
     // sprintf(firstCol, "$f(%lg)$", point);
@@ -238,10 +244,11 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
         current = simplifyExpression(tex, context, current);
         tex->active = true;
         DUMP_TREE(context, current, 0);
-        texPrintf(tex, "$f^{(%d)}(x) = $", membPower);
-        exprTexDump(tex, context, current);
-        texPrintf(tex, "\n\n");
-        texPrintf(tex, "$f^{(%d)}(%lg) = %lg$\n\n", membPower, point, curVal);
+        texPrintf(tex, "$ f^{(%d)}(x) = ", membPower);
+        exprTexDumpRecursive(tex, context, current);
+        texPrintf(tex, " $\n\n");
+
+        texPrintf(tex, "\\[ f^{(%d)}(%lg) = %lg \\]\n\n", membPower, point, curVal);
     }
 
     // texEndTable(tex);
@@ -257,11 +264,11 @@ Node_t *TaylorExpansion(TexContext_t *tex, TungstenContext_t *context,
     tex->active = true;
 
 
-    texPrintf(tex, " Имеем ");
-    exprTexDump(tex, context, expr);
+    texPrintf(tex, " Имеем $");
+    exprTexDumpRecursive(tex, context, expr);
     texPrintf(tex, " = ");
-    exprTexDump(tex, context, taylor);
-    texPrintf(tex, "$ + o(x^%d)$\n\n", nmemb - 1);
+    exprTexDumpRecursive(tex, context, taylor);
+    texPrintf(tex, " + o(x^{%d}) $\n\n", nmemb - 1);
 
     return taylor;
 }
