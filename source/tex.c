@@ -77,12 +77,12 @@ int texBeginGraph(TexContext_t *tex, const char *xLabel, const char *yLabel, con
     );
 }
 
-int texAddGraph(TexContext_t *tex, double *x, double *y, int pointsCount) {
+int texAddGraph(TexContext_t *tex, const char *color, double *x, double *y, int pointsCount) {
     if (!tex->active) return 0;
     if (!tex->file) return -1;
 
     int result = 0;
-    result += texPrintf(tex, "\\addplot coordinates {\n");
+    result += texPrintf(tex, "\\addplot [color=%s,mark=none] coordinates {\n", color);
 
     for (unsigned idx = 0; idx < pointsCount; idx++) {
         texPrintf(tex, "(%.5lg, %.5lg) ", x[idx], y[idx]);

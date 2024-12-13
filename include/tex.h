@@ -26,7 +26,7 @@ enum TexStatus texClose(TexContext_t *tex);
 
 int texBeginGraph(TexContext_t *tex, const char *xLabel, const char *yLabel, const char *graphTitle);
 int texEndGraph(TexContext_t *tex);
-int texAddGraph(TexContext_t *tex, double *x, double *y, int pointsCount);
+int texAddGraph(TexContext_t *tex, const char *color, double *x, double *y, int pointsCount);
 
 
 int texBeginTable(TexContext_t *tex, unsigned columns);

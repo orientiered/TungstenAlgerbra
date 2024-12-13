@@ -165,7 +165,7 @@ int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *
 /// @brief Plot graph using pgfplots
 /// yMax is maximum module value of y
 TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
-                               const Node_t *expr, const char *variable,
+                               const Node_t *expr, const char *variable, const char *color,
                                double xMin, double xMax, double yMax, unsigned pointsCount);
 
 

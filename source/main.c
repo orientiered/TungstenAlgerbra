@@ -12,8 +12,8 @@
 #include "treeDSL.h"
 
 
-const size_t GRAPH_POINTS_COUNT = 100;
-const double GRAPH_X_DELTA = 10;
+const size_t GRAPH_POINTS_COUNT = 1000;
+const double GRAPH_X_DELTA = 1;
 const double GRAPH_Y_MAX = 10; //module of y
 
 int main(int argc, const char *argv[]) {
@@ -70,8 +70,8 @@ int main(int argc, const char *argv[]) {
                 "};\n"
         );
 
-        plotExprGraph(&tex, &context, expr,   "x", expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
-        plotExprGraph(&tex, &context, taylor, "x", expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
+        plotExprGraph(&tex, &context, expr,   "x", "blue", expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
+        plotExprGraph(&tex, &context, taylor, "x", "red",  expansionPoint - GRAPH_X_DELTA, expansionPoint + GRAPH_X_DELTA, GRAPH_Y_MAX, GRAPH_POINTS_COUNT);
 
         texEndGraph(&tex);
         deleteTree(taylor);

@@ -336,7 +336,7 @@ int exprTexDumpRecursive(TexContext_t *tex, TungstenContext_t *context, Node_t *
 }
 
 TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
-                               const Node_t *expr, const char *variable,
+                               const Node_t *expr, const char *variable, const char *color,
                                double xMin, double xMax, double yMax, unsigned pointsCount) {
 
     double *pointsMemory = CALLOC(pointsCount * 2, double);
@@ -358,7 +358,7 @@ TungstenStatus_t plotExprGraph(TexContext_t *tex, TungstenContext_t *context,
         }
     }
 
-    texAddGraph(tex, xCoords, yCoords, calculatedPoints);
+    texAddGraph(tex, color, xCoords, yCoords, calculatedPoints);
 
     free(pointsMemory);
     return TA_SUCCESS;
